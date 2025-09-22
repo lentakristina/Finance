@@ -23,7 +23,7 @@ export default function ProgressGoals() {
   const fetchCategories = async () => {
     try {
       const res = await api.get("/categories");
-      setCategories(res.data.filter((c) => c.type === "save")); // hanya kategori saving
+      setCategories(res.data.filter((c) => c.type === "saving")); // hanya kategori saving
     } catch (err) {
       console.error("Error fetching categories:", err.response?.data || err);
     }

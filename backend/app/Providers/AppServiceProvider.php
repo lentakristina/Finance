@@ -2,23 +2,20 @@
 
 namespace App\Providers;
 
-use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\ServiceProvider; // ← ini WAJIB ada
 use App\Models\Transaction;
 use App\Observers\TransactionObserver;
 
 class AppServiceProvider extends ServiceProvider
 {
-    /**
-     * Register services.
-     */
     public function register(): void
     {
-        //
+        // binding service allocator
+        $this->app->singleton(\App\Services\SavingAllocatorService::class, function ($app) {
+            return new \App\Services\SavingAllocatorService();
+        });
     }
 
-    /**
-     * Bootstrap services.
-     */
     public function boot(): void
     {
         Transaction::observe(TransactionObserver::class);

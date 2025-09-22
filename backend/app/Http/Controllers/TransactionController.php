@@ -29,7 +29,7 @@ class TransactionController extends Controller
 
         // Kalau transaksi saving dan ada goal_id → update goal
         $category = \DB::table('categories')->where('id', $request->category_id)->first();
-        if ($category && $category->type === 'save' && $request->goal_id) {
+        if ($category && $category->type === 'saving' && $request->goal_id) {
             \DB::table('goals')
                 ->where('id', $request->goal_id)
                 ->increment('current_amount', $request->amount);
