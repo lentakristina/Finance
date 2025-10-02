@@ -9,17 +9,33 @@ class Goal extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['name','target_amount','current_amount','priority','allocation_pct','category_id'];
+    protected $fillable = [
+        'user_id',
+        'name',
+        'target_amount',
+        'current_amount', // pastikan ini ada
+        'category_id'
+    ];
+
+    // Relations
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
 
     public function category()
     {
         return $this->belongsTo(Category::class);
     }
 
-    public function savingsLogs()
+    public function transactions()
+    {
+        return $this->hasMany(Transaction::class);
+    }
+
+    public function savingsLogs() 
     {
         return $this->hasMany(SavingsLog::class);
     }
-}
 
- 
+}

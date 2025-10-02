@@ -7,21 +7,24 @@ use Illuminate\Http\Request;
 
 class CategoryController extends Controller
 {
+    // Ambil semua kategori (shared)
     public function index()
     {
         return Category::all();
     }
 
+    // Tambah kategori baru
     public function store(Request $request)
     {
         $request->validate([
-            'name' => 'required',
-            'type' => 'required|in:income,expense,save',
+            'name' => 'required|string',
+            'type' => 'required|in:income,expense,saving',
         ]);
 
         return Category::create($request->all());
     }
 
+    // Update kategori
     public function update(Request $request, $id)
     {
         $category = Category::findOrFail($id);
@@ -29,6 +32,7 @@ class CategoryController extends Controller
         return $category;
     }
 
+    // Hapus kategori
     public function destroy($id)
     {
         return Category::destroy($id);
