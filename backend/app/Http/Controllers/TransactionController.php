@@ -46,21 +46,12 @@ class TransactionController extends Controller
         }
     }
 
-// ===========================
-// Create transaksi baru
-// ===========================
-public function store(Request $request)
+ public function store(Request $request)
 {
     $userId = auth()->id();
     if (!$userId) return response()->json(['message' => 'Unauthorized'], 401);
 
     try {
-         Log::info('=== INCOMING REQUEST ===', [
-            'raw_input' => $request->all(),
-            'goal_id' => $request->goal_id,
-            'category_id' => $request->category_id,
-            'amount' => $request->amount
-        ]);
         $validated = $request->validate([
             'date' => 'required|date',
             'category_id' => 'required|exists:categories,id',
@@ -68,169 +59,59 @@ public function store(Request $request)
             'note' => 'nullable|string|max:255',
             'goal_id' => 'nullable|exists:goals,id'
         ]);
-        Log::info('=== VALIDATED DATA ===', $validated);
 
         DB::beginTransaction();
 
         $transaction = Transaction::create([
             'user_id' => $userId,
             'date' => $validated['date'],
-            'category_id' => (int)$validated['category_id'],
-            'amount' => (float)$validated['amount'],
+            'category_id' => $validated['category_id'],
+            'amount' => $validated['amount'],
             'note' => $validated['note'] ?? null,
-            'goal_id' => !empty($validated['goal_id']) ? (int)$validated['goal_id'] : null
-        ]);
-         Log::info('=== CREATED TRANSACTION ===', [
-            'id' => $transaction->id,
-            'goal_id' => $transaction->goal_id,
-            'amount' => $transaction->amount
+            'goal_id' => $validated['goal_id'] ?? null
         ]);
 
-        $transaction->load(['category', 'goal']);
+        $transaction->load('category');
 
         if ($transaction->goal_id && $transaction->category->type === 'saving') {
-            $goal = Goal::lockForUpdate()->find($transaction->goal_id); //
-            $goal = Goal::find($transaction->goal_id);
-            $goal->refresh();
-        if ($goal) {
-            // Hitung sisa yang tersedia
-            $available = $goal->target_amount - $goal->current_amount;
-
-            // Validasi: gunakan >= untuk allow exact match
-            if ($transaction->amount > $available) {
-                DB::rollBack();
-                return response()->json([
-                    'message' => "Amount melebihi target goal, maksimum allowed: {$available}",
-                    'debug' => [
-                        'target_amount' => $goal->target_amount,
-                        'current_amount' => $goal->current_amount,
-                        'available' => $available,
-                        'input_amount' => $transaction->amount
-                    ]
-                ], 422);
-            }
-
-            // Cek apakah akan melebihi target setelah ditambahkan
-            $newTotal = $goal->current_amount + $transaction->amount;
-            if ($newTotal > $goal->target_amount) {
-                DB::rollBack();
-                return response()->json([
-                    'message' => "Total akan melebihi target. Maksimum allowed: {$available}"
-                ], 422);
-            }
-
-            // update goal
-            $goal->current_amount += $transaction->amount;
-            $goal->save();
-
-            // create savings log
-            SavingsLog::create([
-                'transaction_id' => $transaction->id,
-                'goal_id' => $goal->id,
-                'user_id' => $userId,
-                'amount' => $transaction->amount,
-            ]);
-        }
-}
-
-        DB::commit();
-        return response()->json($transaction, 201);
-
-    } catch (\Illuminate\Validation\ValidationException $e) {
-        return response()->json(['message' => 'Validation failed', 'errors' => $e->errors()], 422);
-    } catch (\Exception $e) {
-        DB::rollBack();
-        Log::error('Transaction creation failed', ['error' => $e->getMessage()]);
-        return response()->json(['message' => 'Failed to create transaction: ' . $e->getMessage()], 500);
-    }
-}
-
-// ===========================
-// Update transaksi
-// ===========================
-public function update(Request $request, $id)
-{
-    $userId = auth()->id();
-    if (!$userId) return response()->json(['message' => 'Unauthorized'], 401);
-
-    try {
-        $transaction = Transaction::where('id', $id)
-            ->where('user_id', $userId)
-            ->with('category')
-            ->firstOrFail();
-
-        // Simpan nilai lama
-        $oldAmount = $transaction->amount;
-        $oldGoalId = $transaction->goal_id;
-        $oldCategoryType = $transaction->category->type;
-
-        $validated = $request->validate([
-            'date' => 'required|date',
-            'category_id' => 'required|exists:categories,id',
-            'amount' => 'required|numeric|min:0.01',
-            'note' => 'nullable|string|max:255',
-            'goal_id' => 'nullable|exists:goals,id'
-        ]);
-
-        DB::beginTransaction();
-
-        // STEP 1: Rollback old goal jika saving
-        if ($oldGoalId && $oldCategoryType === 'saving') {
-            $oldGoal = Goal::lockForUpdate()->find($oldGoalId);
-            if ($oldGoal) {
-                $oldGoal->current_amount -= $oldAmount;
-                if ($oldGoal->current_amount < 0) $oldGoal->current_amount = 0;
-                $oldGoal->save();
-
-                SavingsLog::where('transaction_id', $transaction->id)->delete();
-            }
-        }
-
-        // STEP 2: Update transaksi
-        $transaction->update([
-            'date' => $validated['date'],
-            'category_id' => (int)$validated['category_id'],
-            'amount' => (float)$validated['amount'],
-            'note' => $validated['note'] ?? null,
-            'goal_id' => !empty($validated['goal_id']) ? (int)$validated['goal_id'] : null
-        ]);
-
-        $transaction->load(['category', 'goal']);
-
-        // STEP 3: Validasi & update goal BARU jika saving
-        $newGoalId = $transaction->goal_id;
-        $newCategoryType = $transaction->category->type;
-
-        if ($newGoalId && $newCategoryType === 'saving') {
-            $goal = Goal::lockForUpdate()->find($newGoalId);
+            $goal = Goal::lockForUpdate()->find($transaction->goal_id);
+            
             if ($goal) {
-                // Hitung available berdasarkan current_amount yang sudah di-rollback
-                $available = $goal->target_amount - $goal->current_amount;
+                // ✅ Hitung dari transaksi (source of truth)
+                $calculatedCurrent = Transaction::where('goal_id', $goal->id)
+                    ->where('id', '!=', $transaction->id) // Exclude transaksi baru
+                    ->sum('amount');
+                
+                $available = $goal->target_amount - $calculatedCurrent;
 
+                Log::info('Goal validation', [
+                    'goal_id' => $goal->id,
+                    'goal_name' => $goal->name,
+                    'target' => $goal->target_amount,
+                    'current_calculated' => $calculatedCurrent,
+                    'available' => $available,
+                    'input_amount' => $transaction->amount
+                ]);
+
+                // ✅ Validasi
                 if ($transaction->amount > $available) {
                     DB::rollBack();
                     return response()->json([
-                        'message' => "Amount melebihi target goal, maksimum allowed: {$available}",
-                        'debug' => [
-                            'target_amount' => $goal->target_amount,
-                            'current_amount' => $goal->current_amount,
-                            'available' => $available,
-                            'input_amount' => $transaction->amount
-                        ]
+                        'message' => "Amount melebihi sisa target goal '{$goal->name}'. Maksimum: " . number_format($available, 0, ',', '.')
                     ], 422);
                 }
 
-                // Cek apakah akan melebihi target setelah ditambahkan
-                $newTotal = $goal->current_amount + $transaction->amount;
-                if ($newTotal > $goal->target_amount) {
-                    DB::rollBack();
-                    return response()->json([
-                        'message' => "Total akan melebihi target. Maksimum allowed: {$available}"
-                    ], 422);
-                }
-
-                $goal->current_amount += $transaction->amount;
+                // ✅ Update dengan nilai calculated + input baru
+                $newCurrent = $calculatedCurrent + $transaction->amount;
+                $goal->current_amount = $newCurrent;
                 $goal->save();
+
+                Log::info('Goal updated', [
+                    'goal_id' => $goal->id,
+                    'new_current_amount' => $newCurrent,
+                    'target' => $goal->target_amount,
+                    'is_completed' => $newCurrent >= $goal->target_amount
+                ]);
 
                 SavingsLog::create([
                     'transaction_id' => $transaction->id,
@@ -242,57 +123,166 @@ public function update(Request $request, $id)
         }
 
         DB::commit();
-        return response()->json($transaction);
+        
+        return response()->json($transaction->load(['category', 'goal']), 201);
 
     } catch (\Illuminate\Validation\ValidationException $e) {
         return response()->json(['message' => 'Validation failed', 'errors' => $e->errors()], 422);
     } catch (\Exception $e) {
         DB::rollBack();
-        Log::error('Transaction update failed', ['error' => $e->getMessage(), 'transaction_id' => $id]);
-        return response()->json(['message' => 'Failed to update transaction: ' . $e->getMessage()], 500);
+        Log::error('Transaction creation failed: ' . $e->getMessage());
+        return response()->json(['message' => 'Failed to create transaction'], 500);
     }
 }
 
+    // ===========================
+    // Update transaksi
+    // ===========================
+    public function update(Request $request, $id)
+    {
+        $userId = auth()->id();
+        if (!$userId) return response()->json(['message' => 'Unauthorized'], 401);
 
-// ===========================
-// Delete transaksi
-// ===========================
-public function destroy($id)
-{
-    $userId = auth()->id();
-    if (!$userId) return response()->json(['message' => 'Unauthorized'], 401);
+        try {
+            $transaction = Transaction::where('id', $id)
+                ->where('user_id', $userId)
+                ->with('category')
+                ->firstOrFail();
 
-    try {
-        $transaction = Transaction::where('id', $id)
-            ->where('user_id', $userId)
-            ->firstOrFail();
+            // Simpan nilai lama
+            $oldAmount = $transaction->amount;
+            $oldGoalId = $transaction->goal_id;
+            $oldCategoryType = $transaction->category->type;
 
-        DB::beginTransaction();
+            $validated = $request->validate([
+                'date' => 'required|date',
+                'category_id' => 'required|exists:categories,id',
+                'amount' => 'required|numeric|min:0.01',
+                'note' => 'nullable|string|max:255',
+                'goal_id' => 'nullable|exists:goals,id'
+            ]);
 
-        // rollback goal jika tipe saving
-        if ($transaction->goal_id && $transaction->category->type === 'saving') {
-            $goal = Goal::find($transaction->goal_id);
-            if ($goal) {
-                $goal->current_amount -= $transaction->amount;
-                if ($goal->current_amount < 0) $goal->current_amount = 0;
-                $goal->save();
+            DB::beginTransaction();
 
-                // hapus savings log terkait transaksi
-                SavingsLog::where('transaction_id', $transaction->id)->delete();
+            // STEP 1: Rollback old goal jika saving
+            if ($oldGoalId && $oldCategoryType === 'saving') {
+                $oldGoal = Goal::lockForUpdate()->find($oldGoalId);
+                if ($oldGoal) {
+                    $oldGoal->current_amount -= $oldAmount;
+                    if ($oldGoal->current_amount < 0) $oldGoal->current_amount = 0;
+                    $oldGoal->save();
+
+                    SavingsLog::where('transaction_id', $transaction->id)->delete();
+                }
             }
+
+            // STEP 2: Update transaksi
+            $transaction->update([
+                'date' => $validated['date'],
+                'category_id' => (int)$validated['category_id'],
+                'amount' => (float)$validated['amount'],
+                'note' => $validated['note'] ?? null,
+                'goal_id' => !empty($validated['goal_id']) ? (int)$validated['goal_id'] : null
+            ]);
+
+            $transaction->load(['category', 'goal']);
+
+            // STEP 3: Validasi & update goal BARU jika saving
+            $newGoalId = $transaction->goal_id;
+            $newCategoryType = $transaction->category->type;
+
+            if ($newGoalId && $newCategoryType === 'saving') {
+                $goal = Goal::lockForUpdate()->find($newGoalId);
+                if ($goal) {
+                    // Hitung available berdasarkan current_amount yang sudah di-rollback
+                    $available = $goal->target_amount - $goal->current_amount;
+
+                    if ($transaction->amount > $available) {
+                        DB::rollBack();
+                        return response()->json([
+                            'message' => "Amount melebihi target goal, maksimum allowed: {$available}",
+                            'debug' => [
+                                'target_amount' => $goal->target_amount,
+                                'current_amount' => $goal->current_amount,
+                                'available' => $available,
+                                'input_amount' => $transaction->amount
+                            ]
+                        ], 422);
+                    }
+
+                    // Cek apakah akan melebihi target setelah ditambahkan
+                    $newTotal = $goal->current_amount + $transaction->amount;
+                    if ($newTotal > $goal->target_amount) {
+                        DB::rollBack();
+                        return response()->json([
+                            'message' => "Total akan melebihi target. Maksimum allowed: {$available}"
+                        ], 422);
+                    }
+
+                    $goal->current_amount += $transaction->amount;
+                    $goal->save();
+
+                    SavingsLog::create([
+                        'transaction_id' => $transaction->id,
+                        'goal_id' => $goal->id,
+                        'user_id' => $userId,
+                        'amount' => $transaction->amount,
+                    ]);
+                }
+            }
+
+            DB::commit();
+            return response()->json($transaction);
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json(['message' => 'Validation failed', 'errors' => $e->errors()], 422);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Transaction update failed', ['error' => $e->getMessage(), 'transaction_id' => $id]);
+            return response()->json(['message' => 'Failed to update transaction: ' . $e->getMessage()], 500);
         }
-
-        // hapus transaksi
-        $transaction->delete();
-
-        DB::commit();
-        return response()->json(['message' => 'Transaction deleted successfully']);
-    } catch (\Exception $e) {
-        DB::rollBack();
-        Log::error('Transaction deletion failed', ['error' => $e->getMessage(), 'transaction_id' => $id]);
-        return response()->json(['message' => 'Failed to delete transaction: ' . $e->getMessage()], 500);
     }
-}
+
+
+    // ===========================
+    // Delete transaksi
+    // ===========================
+    public function destroy($id)
+    {
+        $userId = auth()->id();
+        if (!$userId) return response()->json(['message' => 'Unauthorized'], 401);
+
+        try {
+            $transaction = Transaction::where('id', $id)
+                ->where('user_id', $userId)
+                ->firstOrFail();
+
+            DB::beginTransaction();
+
+            // rollback goal jika tipe saving
+            if ($transaction->goal_id && $transaction->category->type === 'saving') {
+                $goal = Goal::find($transaction->goal_id);
+                if ($goal) {
+                    $goal->current_amount -= $transaction->amount;
+                    if ($goal->current_amount < 0) $goal->current_amount = 0;
+                    $goal->save();
+
+                    // hapus savings log terkait transaksi
+                    SavingsLog::where('transaction_id', $transaction->id)->delete();
+                }
+            }
+
+            // hapus transaksi
+            $transaction->delete();
+
+            DB::commit();
+            return response()->json(['message' => 'Transaction deleted successfully']);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Transaction deletion failed', ['error' => $e->getMessage(), 'transaction_id' => $id]);
+            return response()->json(['message' => 'Failed to delete transaction: ' . $e->getMessage()], 500);
+        }
+    }
 
 
     // ===========================

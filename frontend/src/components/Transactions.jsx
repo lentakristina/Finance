@@ -1,18 +1,9 @@
 import { useState, useEffect } from "react";
 import {
-  Button,
-  Table,
-  Pagination,
-  Modal,
-  Form,
-  Row,
-  Col,
-  Card,
-  Container,
-  Alert,
+  Button, Table, Pagination, Modal, Form, Row, Col, Card, Container, Alert, Placeholder,
 } from "react-bootstrap";
 import api from "../api/axios";
-import { toast } from "react-toastify";
+import toast from "react-hot-toast";
 import "./Transaction.css";
 import { formatCurrency, formatDate } from "../utils/format";
 
@@ -32,7 +23,7 @@ export default function Transactions() {
     category_id: "",
     amount: "",
     note: "",
-    goal_id: "",
+    goal_id: null,
   });
 
   const [currentPage, setCurrentPage] = useState(1);
@@ -42,58 +33,51 @@ export default function Transactions() {
   const fetchTransactions = async () => {
     setLoading(true);
     try {
-      const res = await api.get("/transactions");
-      setTransactions(res.data);
-    } catch (err) {
-  console.log("=== ERROR CAUGHT ===");
-  console.log("Status:", err.response?.status);
-  
-  // Log dengan cara yang lebih eksplisit
-  const errorData = err.response?.data;
-  console.log("Error message:", errorData?.message);
-  console.log("Error errors:", errorData?.errors);
-  
-  // Stringify untuk melihat semua isi
-  console.log("Full error JSON:", JSON.stringify(errorData, null, 2));
-  console.error("=== ERROR CAUGHT ===");
-  console.error("Full error:", err);
-  console.error("Response status:", err.response?.status);
-  console.error("Response data:", err.response?.data);
-  console.error("Response errors:", err.response?.data?.errors);
-  console.error("Response message:", err.response?.data?.message);
-
-  if (err.response?.status === 422) {
-    const errorData = err.response?.data;
-    
-    // Log semua detail error
-    console.log("Full error data:", JSON.stringify(errorData, null, 2));
-    
-    const errors = errorData?.errors;
-    if (errors) {
-      Object.entries(errors).forEach(([field, messages]) => {
-        console.log(`Field "${field}" errors:`, messages);
-        messages.forEach(msg => toast.error(`${field}: ${msg}`, { autoClose: 5000 }));
+      const [txRes, goalsRes] = await Promise.all([
+        api.get("/transactions"),
+        api.get("/goals")
+      ]);
+      
+      const txData = txRes.data || [];
+      const goalsData = goalsRes.data || [];
+      
+      console.log('📦 Fetched data:', {
+        transactions: txData.length,
+        goals: goalsData.length
       });
-    } else if (errorData?.message) {
-      toast.error(errorData.message, { autoClose: 4000 });
-    } else {
-      toast.error("Validation error. Check console for details.");
-    }
-  } else {
-    toast.error("Failed to save transaction");
-  }
-} finally {
-  console.log('=== FORM SUBMIT END ===');
-  setLoading(false);
-}
-  };
-
-  const fetchCategories = async () => {
-    try {
-      const res = await api.get("/categories");
-      setCategories(res.data);
+      
+      const correctedGoals = goalsData.map(goal => {
+        const goalTransactions = txData.filter(tx => tx.goal_id === goal.id);
+        
+        const calculatedAmount = goalTransactions.reduce(
+          (sum, tx) => sum + parseFloat(tx.amount || 0),
+          0
+        );
+        
+        console.log(`Goal "${goal.name}" (ID: ${goal.id}):`, {
+          backend: parseFloat(goal.current_amount),
+          calculated: calculatedAmount,
+          diff: parseFloat(goal.current_amount) - calculatedAmount,
+          transactions: goalTransactions.length,
+          transaction_ids: goalTransactions.map(t => t.id)
+        });
+        
+        return {
+          ...goal,
+          current_amount: calculatedAmount
+        };
+      });
+      
+      setTransactions(txData);
+      setGoals(correctedGoals);
+      
+      console.log('✅ Data loaded & recalculated');
+      
     } catch (err) {
-      toast.error("Failed to load categories ❌");
+      console.error("Failed to fetch data:", err);
+      toast.error("Failed to load data");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -102,14 +86,64 @@ export default function Transactions() {
       const res = await api.get("/goals");
       setGoals(res.data || []);
     } catch (err) {
-      toast.error("Failed to load goals ❌");
+      toast.error("Failed to load goals");
+    }
+  };
+
+  const recalculateGoals = async (transactionsData = null) => {
+    try {
+      const [goalsRes, txRes] = await Promise.all([
+        api.get("/goals"),
+        transactionsData ? Promise.resolve({ data: transactionsData }) : api.get("/transactions")
+      ]);
+      
+      const goalsData = goalsRes.data || [];
+      const txData = txRes.data || [];
+      
+      console.log('🔄 Recalculating goals...');
+      
+      const correctedGoals = goalsData.map(goal => {
+        const goalTransactions = txData.filter(tx => tx.goal_id === goal.id);
+        
+        const correctAmount = goalTransactions.reduce(
+          (sum, tx) => sum + parseFloat(tx.amount || 0),
+          0
+        );
+        
+        console.log(`Goal "${goal.name}" (ID: ${goal.id}):`, {
+          fromBackend: parseFloat(goal.current_amount),
+          calculated: correctAmount,
+          difference: parseFloat(goal.current_amount) - correctAmount,
+          transactions: goalTransactions.length
+        });
+        
+        return {
+          ...goal,
+          current_amount: correctAmount.toFixed(2),
+          backend_amount: goal.current_amount
+        };
+      });
+      
+      setGoals(correctedGoals);
+      console.log('✅ Goals recalculated');
+      
+    } catch (err) {
+      console.error("Failed to recalculate goals:", err);
+    }
+  };
+
+  const fetchCategories = async () => {
+    try {
+      const res = await api.get("/categories");
+      setCategories(res.data);
+    } catch (err) {
+      toast.error("Failed to load categories");
     }
   };
 
   useEffect(() => {
     fetchTransactions();
     fetchCategories();
-    fetchGoals();
   }, []);
 
   // ================= MODAL HANDLER =================
@@ -117,11 +151,11 @@ export default function Transactions() {
     setModalMode("add");
     setSelectedTx(null);
     setFormData({
-      date: new Date().toISOString().split("T")[0], // Set today's date as default
+      date: new Date().toISOString().split("T")[0],
       category_id: "",
       amount: "",
       note: "",
-      goal_id: "",
+      goal_id: null,
     });
     setSelectedCategory(undefined);
     setShowModal(true);
@@ -146,159 +180,132 @@ export default function Transactions() {
     if (!window.confirm("Are you sure you want to delete this transaction?")) return;
     try {
       await api.delete(`/transactions/${id}`);
-      fetchTransactions();
-      toast.success("Transaction deleted 🗑️", { autoClose: 2500 });
+      await fetchTransactions();
+      toast.success("Transaction deleted 🗑️");
     } catch (err) {
-      toast.error("Failed to delete transaction ❌");
+      toast.error("Failed to delete transaction");
     }
   };
 
-// ================= FORM HANDLER =================
-const handleSave = async (e) => {
-  e.preventDefault();
-  setLoading(true);
+  const handleSave = async (e) => {
+    e.preventDefault();
+    setLoading(true);
 
-  try {
-    // Parse angka
-    const amount = parseFloat(formData.amount);
-    const categoryId = parseInt(formData.category_id, 10);
-    const goalId = formData.goal_id ? parseInt(formData.goal_id, 10) : null;
+    try {
+      const amount = parseFloat(formData.amount);
+      const categoryId = parseInt(formData.category_id, 10);
+      const goalId = formData.goal_id ? parseInt(formData.goal_id, 10) : null;
 
-    console.log('=== FORM SUBMIT START ===');
-    console.log('Amount:', amount);
-    console.log('Category ID:', categoryId);
-    console.log('Goal ID:', goalId);
-    console.log('Selected Category:', selectedCategory);
+      // VALIDASI BASIC
+      if (!categoryId || isNaN(categoryId)) {
+        toast.error("Category is required");
+        setLoading(false);
+        return;
+      }
 
-    // ======== VALIDASI BASIC =========
-    if (!categoryId || isNaN(categoryId)) {
-      toast.error("Category is required ❌");
-      setLoading(false);
-      return;
-    }
+      if (isNaN(amount) || amount <= 0) {
+        toast.error("Amount must be greater than 0");
+        setLoading(false);
+        return;
+      }
 
-    if (isNaN(amount) || amount <= 0) {
-      toast.error("Amount must be greater than 0 ❌");
-      setLoading(false);
-      return;
-    }
+      if (!formData.date) {
+        toast.error("Date is required");
+        setLoading(false);
+        return;
+      }
 
-    if (!formData.date) {
-      toast.error("Date is required ❌");
-      setLoading(false);
-      return;
-    }
-
-    // ⭐ HANYA validasi jika user MEMILIH goal
-    if (selectedCategory?.type === "saving" && goalId) {
-      console.log('🔍 Validating amount vs goal target...');
-      
-      // Ambil data goal TERBARU
-      const freshGoalsRes = await api.get("/goals");
-      const freshGoals = freshGoalsRes.data || [];
-      
-      const selectedGoal = freshGoals.find((g) => g.id === goalId);
-      
-      if (selectedGoal) {
-        const currentAmount = parseFloat(selectedGoal.current_amount) || 0;
-        const targetAmount = parseFloat(selectedGoal.target_amount);
-        const remaining = targetAmount - currentAmount;
-        
-        console.log(`Goal "${selectedGoal.name}": target=${targetAmount}, current=${currentAmount}, remaining=${remaining}`);
-        
-        if (amount > remaining) {
-          console.log('❌ VALIDATION FAILED - Amount exceeds remaining!');
-          toast.error(
-            `Amount melebihi sisa target goal "${selectedGoal.name}"! Maksimum: ${formatCurrency(remaining)}`,
-            { 
-              autoClose: 5000,
-              position: "top-center",
-            }
+      // VALIDASI GOAL
+      if (selectedCategory?.type === "saving" && goalId) {
+        const selectedGoal = goals.find(g => g.id === goalId);
+        if (selectedGoal) {
+          const existingTransactions = transactions.filter(
+            tx => tx.goal_id === goalId && tx.id !== selectedTx?.id
           );
-          setLoading(false);
-          return;
+          const calculatedCurrentAmount = existingTransactions.reduce(
+            (sum, tx) => sum + parseFloat(tx.amount || 0), 0
+          );
+          const targetAmount = parseFloat(selectedGoal.target_amount);
+          const remaining = targetAmount - calculatedCurrentAmount;
+
+          if (amount > remaining) {
+            toast.error(
+              `Amount exceeds remaining goal!\n\nGoal: ${selectedGoal.name}\nRemaining: ${formatCurrency(remaining)}\nYour input: ${formatCurrency(amount)}`,
+              { duration: 5000 }
+            );
+            setLoading(false);
+            return;
+          }
         }
-        
-        console.log('✅ Validation passed');
       }
-    }
 
-    // ======== PREPARE PAYLOAD ========
-    const payload = {
-      date: new Date(formData.date).toISOString().split("T")[0],
-      category_id: categoryId,
-      amount: amount,
-    };
+      // PREPARE PAYLOAD
+      const payload = {
+        date: new Date(formData.date).toISOString().split("T")[0],
+        category_id: categoryId,
+        amount,
+        ...(formData.note?.trim() && { note: formData.note.trim() }),
+        ...(goalId && { goal_id: goalId })
+      };
 
-    if (formData.note && formData.note.trim()) {
-      payload.note = formData.note.trim();
-    }
+      // REQUEST KE BACKEND
+      let response = modalMode === "add"
+        ? await api.post("/transactions", payload)
+        : await api.put(`/transactions/${selectedTx.id}`, payload);
 
-    // ⭐ HANYA kirim goal_id jika user memilih goal
-    if (goalId) {
-      payload.goal_id = goalId;
-    }
+      // SUCCESS
+      toast.success(
+        modalMode === "add" 
+          ? "Transaction added successfully!" 
+          : "Transaction updated!"
+      );
 
-    console.log('📦 Sending payload:', payload);
+      await fetchTransactions();
+      handleCloseModal();
 
-    // ======== REQUEST ========
-    if (modalMode === "add") {
-      await api.post("/transactions", payload);
-      toast.success("Transaction added 🎉", { autoClose: 2500 });
-    } else {
-      await api.put(`/transactions/${selectedTx.id}`, payload);
-      toast.info("Transaction updated ✏️", { autoClose: 2500 });
-    }
-
-    console.log('✅ Transaction saved successfully');
-
-    // Refresh data
-    await fetchGoals();
-    await fetchTransactions();
-    handleCloseModal();
-
-  } catch (err) {
-    console.error("=== ERROR CAUGHT ===");
-    console.error("Full error:", err);
-    console.error("Response:", err.response?.data);
-
-    if (err.response?.status === 422) {
-      const errorData = err.response?.data;
-      
-      // Tampilkan error dari backend
-      if (errorData?.message) {
-        toast.error(errorData.message, { autoClose: 5000 });
+    } catch (err) {
+      if (err.response) {
+        const { status, data } = err.response;
+        if (status === 422) {
+          if (data?.message) {
+            toast.error(data.message);
+          }
+          if (data?.errors) {
+            Object.values(data.errors).forEach(arr =>
+              arr.forEach(msg => toast.error(msg))
+            );
+          }
+        } else if (status === 401) {
+          toast.error("Unauthorized. Please login again.");
+        } else if (status === 404) {
+          toast.error("Resource not found");
+        } else if (status === 500) {
+          toast.error("Server error. Please try again later.");
+        } else {
+          toast.error(data?.message || "Failed to save transaction");
+        }
+      } else if (err.request) {
+        toast.error("Network error. Please check your connection.");
+      } else {
+        toast.error("An unexpected error occurred");
       }
-      
-      // Tampilkan validation errors
-      if (errorData?.errors) {
-        Object.values(errorData.errors).forEach((arr) => 
-          arr.forEach(msg => toast.error(msg, { autoClose: 4000 }))
-        );
-      }
-    } else {
-      toast.error("Failed to save transaction ❌");
+    } finally {
+      setLoading(false);
     }
-  } finally {
-    console.log('=== FORM SUBMIT END ===');
-    setLoading(false);
-  }
-};
+  };
 
-
-const handleCloseModal = () => {
-  setShowModal(false);
-  setFormData({
-    date: "",
-    category_id: "",
-    amount: "",
-    note: "",
-    goal_id: "",
-  });
-  setSelectedCategory(undefined);
-  setModalMode("add");
-};
-
+  const handleCloseModal = () => {
+    setShowModal(false);
+    setFormData({
+      date: "",
+      category_id: "",
+      amount: "",
+      note: "",
+      goal_id: null,
+    });
+    setSelectedCategory(undefined);
+    setModalMode("add");
+  };
 
   // ================= PAGINATION =================
   const indexOfLast = currentPage * itemsPerPage;
@@ -309,28 +316,64 @@ const handleCloseModal = () => {
   // ================= UI =================
   return (
     <Container fluid className="transaction-container">
-        {/* Header */}
       <div className="d-flex justify-content-between align-items-center mt-4 mb-4">
         <h3>Transaction History</h3>
         <Button 
-          onClick= {handleAdd}  
+          onClick={handleAdd}  
           variant="primary"
           size="sm">
           <i className="bi bi-plus-lg me-1"></i> Add Transaction
         </Button>
       </div>
 
-
       <div>
-        {/* Transactions Table */}
         <Card className="border-0 shadow-sm">
           <Card.Body className="p-0">
             {loading ? (
-              <div className="text-center py-5">
-                <div className="spinner-border text-primary" role="status">
-                  <span className="visually-hidden">Loading...</span>
-                </div>
-                <p className="mt-2 text-muted">Loading transactions...</p>
+              <div className="p-4">
+                <Table hover className="align-middle mb-0">
+                  <thead className="bg-light">
+                    <tr>
+                      <th className="border-0 px-4 py-3">Date</th>
+                      <th className="border-0 px-4 py-3">Category</th>
+                      <th className="border-0 px-4 py-3">Amount</th>
+                      <th className="border-0 px-4 py-3">Note</th>
+                      <th className="border-0 px-4 py-3 text-center">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[...Array(5)].map((_, i) => (
+                      <tr key={i}>
+                        <td className="px-4 py-3">
+                          <Placeholder animation="glow">
+                            <Placeholder xs={6} />
+                          </Placeholder>
+                        </td>
+                        <td className="px-4 py-3">
+                          <Placeholder animation="glow">
+                            <Placeholder xs={4} />
+                          </Placeholder>
+                        </td>
+                        <td className="px-4 py-3">
+                          <Placeholder animation="glow">
+                            <Placeholder xs={5} />
+                          </Placeholder>
+                        </td>
+                        <td className="px-4 py-3">
+                          <Placeholder animation="glow">
+                            <Placeholder xs={8} />
+                          </Placeholder>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <div className="d-flex justify-content-center gap-2">
+                            <Placeholder.Button xs={4} variant="outline-secondary" />
+                            <Placeholder.Button xs={4} variant="outline-secondary" />
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </Table>
               </div>
             ) : (
               <div className="table-responsive">
@@ -346,13 +389,16 @@ const handleCloseModal = () => {
                   </thead>
                   <tbody>
                     {currentItems.map((t, index) => (
-                      <tr key={t.id} className={index % 2 === 0 ? "bg-white" : "bg-light bg-opacity-25"}>
+                      <tr
+                        key={t.id}
+                        className={index % 2 === 0 ? "bg-white" : "bg-light bg-opacity-25"}
+                      >
                         <td className="px-4 py-3">
                           <span className="fw-medium">{formatDate(t.date)}</span>
                         </td>
                         <td className="px-4 py-3">
                           <span className="badge bg-secondary bg-opacity-10 text-dark px-3 py-2">
-                            {t.category?.name || 'N/A'}
+                            {t.category?.name || "N/A"}
                           </span>
                         </td>
                         <td className="px-4 py-3">
@@ -361,34 +407,26 @@ const handleCloseModal = () => {
                           </span>
                         </td>
                         <td className="px-4 py-3">
-                          <span className="text-muted">
-                            {t.note || '-'}
-                          </span>
+                          <span className="text-muted">{t.note || "-"}</span>
                         </td>
                         <td className="text-center">
                           <div className="btn-group" role="group">
-
-                        {/* Tombol aksi table */}
-                          <Button 
-                            size="sm" 
-                            className="btn-action-outline me-2"
-                            onClick={() => handleDelete(t.id)}
-                          >
-                            <i className="bi bi-trash me-1"></i> Delete
-                          </Button>
-
-                          <Button 
-                            size="sm" 
-                            className="btn-action-outline"
-                            onClick={() => handleEdit(t)}
-                          >
-                            <i className="bi bi-pencil me-1"></i> Update
-                          </Button>
-
-
+                            <Button
+                              size="sm"
+                              className="btn-action-outline me-2"
+                              onClick={() => handleDelete(t.id)}
+                            >
+                              <i className="bi bi-trash me-1"></i> Delete
+                            </Button>
+                            <Button
+                              size="sm"
+                              className="btn-action-outline"
+                              onClick={() => handleEdit(t)}
+                            >
+                              <i className="bi bi-pencil me-1"></i> Update
+                            </Button>
                           </div>
                         </td>
-
                       </tr>
                     ))}
                     {currentItems.length === 0 && (
@@ -409,7 +447,6 @@ const handleCloseModal = () => {
           </Card.Body>
         </Card>
 
-        {/* Pagination */}
         {totalPages > 1 && (
           <div className="d-flex justify-content-center mt-4">
             <Pagination className="mb-0">
@@ -435,7 +472,6 @@ const handleCloseModal = () => {
         )}
       </div>
 
-      {/* ================= Modal Card Form ================= */}
       <Modal
         show={showModal}
         onHide={handleCloseModal}
@@ -512,14 +548,9 @@ const handleCloseModal = () => {
                       value={formData.category_id}
                       onChange={(e) => {
                         const catId = e.target.value;
-                        setFormData({ ...formData, category_id: catId, goal_id: "" });
+                        setFormData({ ...formData, category_id: catId, goal_id: null });
                         const cat = categories.find((c) => c.id.toString() === catId);
-
-                        console.log('Selected category ID:', catId);
-                        console.log('Found category:', cat);
-                        console.log('Category type:', cat?.type);
-                        console.log('All categories:', categories);
-
+                        console.log('Selected category:', cat);
                         setSelectedCategory(cat);
                       }}
                       required
@@ -536,41 +567,47 @@ const handleCloseModal = () => {
                 </Col>
 
                 {selectedCategory?.type === "saving" && (
-                <Col md={6}>
-                  <Form.Group>
-                    <Form.Label className="fw-medium">
-                      <i className="bi bi-bullseye me-2"></i>
-                      Goal (optional)
-                    </Form.Label>
-                    <Form.Select
-                      value={formData.goal_id}
-                      onChange={(e) => {
-                        console.log('Goal selected:', e.target.value);
-                        setFormData(prev => ({ ...prev, goal_id: e.target.value }));
-                      }}
-                      className="form-select-lg"
-                    >
-                      <option value="">Create new goal</option>
-                      {(() => {
-                        const availableGoals = goals.filter((g) => {
-                          const remaining = g.target_amount - (g.current_amount || 0);
-                          const hasSpace = remaining > 0;
-                         console.log(`Goal: ${g.name}, Target: ${g.target_amount}, Current: ${g.current_amount}, Remaining: ${remaining}, Has space: ${hasSpace}`);
-                          return hasSpace;
-                        });
-                        
-                        console.log('Available goals:', availableGoals);
-                        
-                        return availableGoals.map((g) => (
-                          <option key={g.id} value={g.id}>
-                            {g.name} (Sisa: {formatCurrency(g.target_amount - (g.current_amount || 0))})
-                          </option>
-                        ));
-                      })()}
-                    </Form.Select>
-                  </Form.Group>
-                </Col>
-              )}
+                  <Col md={6}>
+                    <Form.Group>
+                      <Form.Label className="fw-medium">
+                        <i className="bi bi-bullseye me-2"></i>
+                        Goal (optional)
+                      </Form.Label>
+                      
+                      {goals.length === 0 ? (
+                        <Alert variant="warning" className="mb-0">
+                          <i className="bi bi-exclamation-triangle me-2"></i>
+                          No goals available. Create a goal first.
+                        </Alert>
+                      ) : (
+                        <Form.Select
+                          value={formData.goal_id || ""}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            console.log('Goal selected:', value);
+                            setFormData(prev => ({ 
+                              ...prev, 
+                              goal_id: value === "" ? null : parseInt(value, 10)
+                            }));
+                          }}
+                          className="form-select-lg"
+                        >
+                          <option value="">Don't link to any goal</option>
+                          {goals
+                            .filter((g) => {
+                              const remaining = parseFloat(g.target_amount) - (g.current_amount || 0);
+                              return remaining > 0;
+                            })
+                            .map((g) => (
+                              <option key={g.id} value={g.id}>
+                                {g.name} (Remaining: {formatCurrency(parseFloat(g.target_amount) - (g.current_amount || 0))})
+                              </option>
+                            ))}
+                        </Form.Select>
+                      )}
+                    </Form.Group>
+                  </Col>
+                )}
               </Row>
 
               <Form.Group className="mt-3">

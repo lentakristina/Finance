@@ -1,31 +1,12 @@
-/* ================= Goals Page Container ================= */
-.goals-container {
-  padding: 24px;
-  width: 100%;
-  background: #f8fafc;
-  min-height: 100vh;
+/* Konsisten dengan transaction page */
+.goals-container,
+.transaction-container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding-bottom: 3rem;
 }
 
-/* ================= Glass Card ================= */
-.glass-card {
-  position: relative;
-  background: linear-gradient(135deg, rgba(255,255,255,0.65), rgba(255,255,255,0.4));
-  border-radius: 24px;
-  box-shadow: 0 12px 28px rgba(0,0,0,0.08);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  border: 1px solid rgba(255,255,255,0.35);
-  transition: all 0.35s ease;
-  margin-bottom: 1.5rem;
-  padding: 24px;
-}
-
-.glass-card:hover {
-  transform: translateY(-6px);
-  box-shadow: 0 18px 36px rgba(0,0,0,0.12);
-}
-
-/* ================= Titles ================= */
+/* Title biar sama kayak Transaction */
 .goals-container h3 {
   font-weight: 600;
   color: #1e293b;
@@ -33,104 +14,115 @@
   margin-bottom: 1rem;
 }
 
-
-/* ================= Goal Card ================= */
+/* Kartu goals lebih compact */
 .goal-card {
-  border-radius: 20px;
-  padding: 16px;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
+  border: 1px solid rgba(0, 123, 255, 0.15);
+  border-radius: 14px;
+  padding: 1.2rem;
+  background: linear-gradient(145deg, rgba(255,255,255,0.9), rgba(245,250,255,0.7));
+  backdrop-filter: blur(8px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
 }
 
-.goal-card h5 {
+.goal-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 25px rgba(0, 123, 255, 0.12);
+}
+
+
+/* Header kecil dikit biar proporsional */
+.goal-header h5 {
+  font-size: 1rem;
   font-weight: 600;
-  margin-bottom: 4px;
+  color: #2c3e50;
+  margin: 0;
 }
 
-.goal-card .category-name {
-  font-size: 0.8rem;
-  color: #6c757d;
-}
-
-.goal-card .goal-info {
+.goal-type {
   font-size: 0.85rem;
+  color: #777;
+}
+
+/* Progress bar & teks */
+.progress {
+  height: 10px;
+  border-radius: 10px;
+  background-color: #e9ecef;
+  overflow: hidden;
+}
+
+.progress-bar {
+  background: linear-gradient(90deg, #00b4d8, #007bff);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: white;
+  border-radius: 10px;
+}
+
+
+/* Info bar (Target dan Saved) */
+.goal-info {
   display: flex;
   justify-content: space-between;
-  margin-bottom: 8px;
-  color: #495057;
-}
-
-.goal-card .progress-bar {
-  height: 18px;
-  font-size: 0.75rem;
-}
-
-/* ================= Action Buttons ================= */
-.action-btn {
-  display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 4px;
+  font-size: 0.9rem;
+  color: #555;
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 8px;
+  padding: 0.5rem 0.8rem;
+  margin-bottom: 0.8rem;
+}
+
+
+/* Buttons */
+.goal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+}
+
+.btn-update {
+  border: 1.5px solid #007bff;
+  background-color: transparent;
+  color: #007bff;
+  border-radius: 8px;
+  padding: 0.3rem 1rem;
   font-size: 0.85rem;
-  padding: 4px 8px;
-  border-radius: 6px;
   transition: all 0.2s ease;
 }
 
-/* Edit Button */
-.btn-outline-primary.action-btn {
-  background: transparent;
-  border: 1px solid #0d6efd;
-  color: #0d6efd;
-}
-.btn-outline-primary.action-btn:hover {
-  background: #0d6efd;
-  color: #fff;
+.btn-update:hover {
+  background-color: #007bff;
+  color: white;
 }
 
-/* Delete Button */
-.btn-outline-danger.action-btn {
-  background: transparent;
-  border: 1px solid #dc3545;
-  color: #dc3545;
-}
-.btn-outline-danger.action-btn:hover {
-  background: #dc3545;
-  color: #fff;
-}
-
-/* ================= Modal ================= */
-.modal-content {
-  border-radius: 20px;
-}
-
-.modal-header {
-  border-bottom: 1px solid #dee2e6;
-}
-
-.modal-body label {
-  font-weight: 500;
-  font-size: 0.875rem;
-  color: #1e293b;
-}
-
-/* ================= Buttons ================= */
-.add-goal-btn {
-  padding: 6px 16px;
+.btn-delete {
+  border: 1.5px solid #ff4d4f;
+  background-color: transparent;
+  color: #ff4d4f;
   border-radius: 8px;
-  font-weight: 500;
+  padding: 0.3rem 1rem;
+  font-size: 0.85rem;
+  transition: all 0.2s ease;
 }
 
-/* ================= Responsive ================= */
-@media (max-width: 768px) {
-  .goal-card {
-    padding: 12px;
-  }
+.btn-delete:hover {
+  background-color: #ff4d4f;
+  color: white;
+}
 
-  .action-btn {
-    font-size: 0.75rem;
-    padding: 3px 6px;
-  }
+
+/* Add button style */
+.btn-add {
+  background-color: #007bff;
+  border: none;
+  border-radius: 8px;
+  padding: 0.4rem 1rem;
+  font-weight: 500;
+  transition: background-color 0.2s ease;
+}
+
+.btn-add:hover {
+  background-color: #0056b3;
 }

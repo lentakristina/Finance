@@ -6,6 +6,14 @@
   min-height: 100vh;
 }
 
+/* ================= Titles ================= */
+.transaction-container h3 {
+  font-weight: 600;
+  color: #1e293b;
+  font-size: 1.2rem;
+  margin-bottom: 1rem;
+}
+
 /* ================= Glass Card ================= */
 .glass-card {
   position: relative;
@@ -25,49 +33,50 @@
   box-shadow: 0 18px 36px rgba(0,0,0,0.12);
 }
 
-/* ================= Titles ================= */
-.transaction-container h3 {
-  font-weight: 600;
-  color: #1e293b;
-  font-size: 1.2rem;
-  margin-bottom: 1rem;
+/* ================= Transaction Table Styling ================= */
+
+.transaction-container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding-bottom: 3rem;
 }
 
-/* ================= Table ================= */
-.table {
-  margin-bottom: 0;
-  border-radius: 12px;
-  overflow: hidden;
-  font-size: 0.875rem;
-}
-
-.table thead {
-  background: rgba(248, 250, 252, 0.7);
-  backdrop-filter: blur(12px);
-}
-
-.table thead th {
-  font-weight: 600;
-  padding: 10px;
-  border-bottom: 1px solid #dee2e6;
-}
-
-.table tbody td {
-  padding: 10px;
+.table th,
+.table td {
   vertical-align: middle;
-  border-bottom: 1px solid #dee2e6;
-}
-
-.table tbody tr:hover {
-  background: rgba(240, 250, 255, 0.4);
-}
-
-/* Empty State */
-.table tbody td[colspan] {
   text-align: center;
-  padding: 2rem;
-  color: #6c757d;
+  padding: 0.75rem 1rem;
 }
+
+.table th:first-child,
+.table td:first-child {
+  text-align: left;
+  padding-left: 2rem;
+}
+
+.table th:last-child,
+.table td:last-child {
+  text-align: center;
+  padding-right: 2rem;
+}
+
+/* Subtle hover for rows */
+.table-hover tbody tr:hover {
+  background-color: #f9fafb;
+}
+
+/* Buttons inside table */
+.btn-action-outline {
+  border: 1px solid #ccc;
+  background: white;
+  transition: all 0.2s;
+}
+
+.btn-action-outline:hover {
+  background-color: #f1f3f5;
+  border-color: #aaa;
+}
+
 
 /* ================= Action Buttons (Icon Only) ================= */
 
@@ -98,12 +107,12 @@
   transition: all 0.2s ease-in-out;
   display: inline-flex;
   align-items: center;
-  border: 2px solid #333;  /* warna frame hitam/abu */
-  color: #333;              /* teks hitam/abu */
+  border: 2px solid #333;  
+  color: #333;              
 }
 
 .btn-action-outline:hover {
-  background-color: rgba(0, 0, 0, 0.05); /* hover ringan */
+  background-color: rgba(0, 0, 0, 0.05); 
   transform: scale(1.1);
 }
 

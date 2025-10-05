@@ -158,47 +158,58 @@ export default function Dashboard() {
   }, []);
 
   return (
-    <div className="dashboard-container">
-      {/* --- Monthly Income & Expense --- */}
-      <Row className="mb-4">
-        <Col md={6}>
-          <motion.div
-            initial={{ opacity: 0, y: 40 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-          >
-            <Card className="glass-card income-card text-center">
-              <h5 className="glass-title">💰 Income (This Month)</h5>
+  <div className="dashboard-container">
+    {/* --- Monthly Income & Expense --- */}
+    <Row className="mb-4">
+      <Col md={6}>
+        <motion.div
+          initial={{ opacity: 0, y: 40 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+        >
+          <Card className="glass-card income-card text-center">
+            <h5 className="glass-title">💰 Income (This Month)</h5>
+            {loadingInsight ? (
+              <Skeleton height={40} width={120} className="mx-auto mt-2" />
+            ) : (
               <h2 className="fw-bold text-success">
                 {formatCurrency(currentMonth.income)}
               </h2>
-            </Card>
-          </motion.div>
-        </Col>
-        <Col md={6}>
-          <motion.div
-            initial={{ opacity: 0, y: 40 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
-          >
-            <Card className="glass-card expense-card text-center">
-              <h5 className="glass-title">💳 Expense (This Month)</h5>
+            )}
+          </Card>
+        </motion.div>
+      </Col>
+      <Col md={6}>
+        <motion.div
+          initial={{ opacity: 0, y: 40 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8 }}
+        >
+          <Card className="glass-card expense-card text-center">
+            <h5 className="glass-title">💳 Expense (This Month)</h5>
+            {loadingInsight ? (
+              <Skeleton height={40} width={120} className="mx-auto mt-2" />
+            ) : (
               <h2 className="fw-bold text-danger">
                 {formatCurrency(currentMonth.expense)}
               </h2>
-            </Card>
-          </motion.div>
-        </Col>
-      </Row>
+            )}
+          </Card>
+        </motion.div>
+      </Col>
+    </Row>
 
-      {/* --- Last 3 Months Chart --- */}
-      <motion.div
-        initial={{ opacity: 0, y: 50 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 1 }}
-      >
-        <Card className="glass-card chart-card p-3">
-          <h5 className="glass-title mb-3">📊 Last 3 Months Summary</h5>
+    {/* --- Last 3 Months Chart --- */}
+    <motion.div
+      initial={{ opacity: 0, y: 50 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 1 }}
+    >
+      <Card className="glass-card chart-card p-3">
+        <h5 className="glass-title mb-3">📊 Last 3 Months Summary</h5>
+        {loadingInsight ? (
+          <Skeleton height={300} />
+        ) : (
           <ResponsiveContainer width="100%" height={300}>
             <BarChart
               data={summary}
@@ -209,34 +220,46 @@ export default function Dashboard() {
               <YAxis tickFormatter={(val) => formatCurrency(val)} />
               <Tooltip formatter={(value) => formatCurrency(value)} />
               <Legend />
-              <Bar dataKey="income" fill="#81c784" name="Income" radius={[6, 6, 0, 0]} />
-              <Bar dataKey="expense" fill="#e57373" name="Expense" radius={[6, 6, 0, 0]} />
+              <Bar
+                dataKey="income"
+                fill="#81c784"
+                name="Income"
+                radius={[6, 6, 0, 0]}
+              />
+              <Bar
+                dataKey="expense"
+                fill="#e57373"
+                name="Expense"
+                radius={[6, 6, 0, 0]}
+              />
             </BarChart>
           </ResponsiveContainer>
-        </Card>
-      </motion.div>
+        )}
+      </Card>
+    </motion.div>
 
-      {/* --- Smart Insight --- */}
-      <motion.div
-        initial={{ opacity: 0, y: 50 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 1.2 }}
-      >
-        <Card className="glass-card p-4 mt-4">
-          <div className="d-flex align-items-center mb-3">
-            <span className="fs-3 me-2">🤖</span>
-            <h4 className="glass-title m-0">Smart Insight</h4>
-          </div>
-          {loadingInsight ? (
-            <Skeleton count={2} />
-          ) : (
-            <p
-              className="text-muted"
-              dangerouslySetInnerHTML={{ __html: insight }}
-            />
-          )}
-        </Card>
-      </motion.div>
-    </div>
-  );
+    {/* --- Smart Insight --- */}
+    <motion.div
+      initial={{ opacity: 0, y: 50 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 1.2 }}
+    >
+      <Card className="glass-card p-4 mt-4">
+        <div className="d-flex align-items-center mb-3">
+          <span className="fs-3 me-2">🤖</span>
+          <h4 className="glass-title m-0">Smart Insight</h4>
+        </div>
+        {loadingInsight ? (
+          <Skeleton count={2} />
+        ) : (
+          <p
+            className="text-muted"
+            dangerouslySetInnerHTML={{ __html: insight }}
+          />
+        )}
+      </Card>
+    </motion.div>
+  </div>
+);
+
 }

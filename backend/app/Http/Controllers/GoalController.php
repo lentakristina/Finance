@@ -13,24 +13,28 @@ class GoalController extends Controller
         return response()->json($goals);
     }
 
+    // ✅ BENAR
     public function store(Request $request)
-    {
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'target_amount' => 'required|numeric|min:0',
-            'category_id' => 'required|exists:categories,id'
-        ]);
+{
+    $userId = auth()->id();
+    if (!$userId) return response()->json(['message' => 'Unauthorized'], 401);
 
-        $goal = Goal::create([
-            'user_id' => auth()->id(),
-            'name' => $validated['name'],
-            'target_amount' => $validated['target_amount'],
-            'current_amount' => 0,
-            'category_id' => $validated['category_id']
-        ]);
+    $validated = $request->validate([
+        'name' => 'required|string|max:255',
+        'target_amount' => 'required|numeric|min:0.01',
+        'category_id' => 'required|exists:categories,id'
+    ]);
 
-        return response()->json($goal, 201);
-    }
+    $goal = Goal::create([
+        'user_id' => $userId,
+        'name' => $validated['name'],
+        'target_amount' => $validated['target_amount'],
+        'current_amount' => 0, // ✅ SELALU 0 untuk goal baru
+        'category_id' => $validated['category_id']
+    ]);
+
+    return response()->json($goal, 201);
+}
 
     public function update(Request $request, $id)
     {

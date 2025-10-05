@@ -8,37 +8,35 @@ import {
   Row,
   Col,
   Modal,
-  Alert,
   Container,
+  Placeholder,
 } from "react-bootstrap";
-import { toast, ToastContainer } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
+import toast from "react-hot-toast";
 import "./Goals.css";
 import { formatCurrency } from "../utils/format";
 
 export default function ProgressGoals() {
   const [goals, setGoals] = useState([]);
   const [categories, setCategories] = useState([]);
-  const [unallocated, setUnallocated] = useState(0);
   const [showModal, setShowModal] = useState(false);
   const [editGoal, setEditGoal] = useState(null);
-  const [allocateModal, setAllocateModal] = useState(false);
-  const [selectedGoal, setSelectedGoal] = useState("");
   const [goalForm, setGoalForm] = useState({
     name: "",
     target_amount: "",
     category_id: "",
   });
+  const [loading, setLoading] = useState(true);
 
   const fetchGoals = async () => {
     try {
+      setLoading(true);
       const res = await api.get("/goals");
       setGoals(res.data || []);
-      setUnallocated(0);
     } catch {
-      toast.error("❌ Failed to load goals");
+      toast.error("Failed to load goals");
       setGoals([]);
-      setUnallocated(0);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -47,7 +45,7 @@ export default function ProgressGoals() {
       const res = await api.get("/categories");
       setCategories((res.data || []).filter((c) => c.type === "saving"));
     } catch {
-      toast.error("❌ Failed to load categories");
+      toast.error("Failed to load categories");
       setCategories([]);
     }
   };
@@ -73,17 +71,17 @@ export default function ProgressGoals() {
     try {
       if (editGoal) {
         await api.put(`/goals/${editGoal.id}`, payload);
-        toast.info("✏️ Goal updated successfully!");
+        toast.success("Goal updated successfully!");
       } else {
         await api.post("/goals", payload);
-        toast.success("✅ Goal added successfully!");
+        toast.success("Goal added successfully!");
       }
       setShowModal(false);
       setEditGoal(null);
       setGoalForm({ name: "", target_amount: "", category_id: "" });
       fetchGoals();
     } catch {
-      toast.error("❌ Failed to save goal");
+      toast.error("Failed to save goal");
     }
   };
 
@@ -91,117 +89,200 @@ export default function ProgressGoals() {
     if (!window.confirm("Are you sure you want to delete this goal?")) return;
     try {
       await api.delete(`/goals/${id}`);
-      toast.warning("🗑 Goal deleted successfully!");
+      toast.success("Goal deleted successfully!");
       fetchGoals();
     } catch {
-      toast.error("❌ Failed to delete goal");
-    }
-  };
-
-  const handleAllocate = async () => {
-    if (!selectedGoal) return toast.error("Please select a goal first!");
-    try {
-      await api.post("/unallocated/allocate", { goal_id: selectedGoal });
-      toast.success("✅ Unallocated savings allocated!");
-      setAllocateModal(false);
-      setSelectedGoal("");
-      fetchGoals();
-    } catch {
-      toast.error("❌ Failed to allocate savings");
+      toast.error("Failed to delete goal");
     }
   };
 
   return (
     <Container fluid className="goals-container">
-      {/* Header */}
-      <div className="d-flex justify-content-between align-items-center mb-4">
-        <h3>Goals Dashboard</h3>
+      <div className="d-flex justify-content-between align-items-center mt-4 mb-4">
+        <h5 className="fw-semibold text-dark mb-0">Goals Dashboard</h5>
         <Button
           onClick={() => setShowModal(true)}
           variant="primary"
-          size="sm">
+          size="sm"
+          className="shadow-sm"
+        >
           <i className="bi bi-plus-lg me-1"></i> Add Goal
         </Button>
       </div>
 
-
-      {/* Goals Grid */}
-      <Row>
-        {goals.map((g) => {
-          const progress = g.target_amount
-            ? Math.min(100, ((g.current_amount ?? 0) / g.target_amount) * 100)
-            : 0;
-          const achieved = progress >= 100;
-
-          return (
-            <Col md={6} lg={4} key={g.id} className="mb-4">
-              <Card className={`goal-card shadow-sm ${achieved ? "border-success" : "border-info"}`}>
-                <Card.Body className="d-flex flex-column h-100">
-                  <div className="d-flex justify-content-between align-items-center mb-2">
-                    <h5>{g.name}</h5>
-                    <span className="category-name">{g.category?.name || "Saving"}</span>
+      {loading ? (
+        <Row>
+          {[1, 2, 3].map((i) => (
+            <Col md={6} lg={4} key={i} className="mb-4">
+              <Card
+                className="shadow-sm border-0"
+                style={{ borderRadius: "1rem" }}
+              >
+                <Card.Body>
+                  <div className="d-flex justify-content-between align-items-center mb-3">
+                    <Placeholder as="h6" animation="glow" className="w-50">
+                      <Placeholder xs={8} />
+                    </Placeholder>
+                    <Placeholder animation="glow" className="w-25">
+                      <Placeholder xs={6} />
+                    </Placeholder>
                   </div>
 
-                  <div className="goal-info d-flex justify-content-between small text-muted mb-2">
-                    <span>🎯 Target: {formatCurrency(g.target_amount ?? 0)}</span>
-                    <span>💰 Saved: {formatCurrency(g.current_amount ?? 0)}</span>
+                  <Placeholder animation="glow">
+                    <Placeholder xs={6} /> <Placeholder xs={4} />
+                  </Placeholder>
+
+                  <div className="mt-3">
+                    <Placeholder as="div" animation="glow" className="w-100">
+                      <Placeholder xs={12} style={{ height: "10px" }} />
+                    </Placeholder>
                   </div>
 
-                  <ProgressBar
-                    now={progress}
-                    label={achieved ? "Goal Achieved!" : `${progress.toFixed(1)}%`}
-                    variant={achieved ? "success" : "info"}
-                    className="mb-3"
-                  />
-
-                  {achieved && (
-                    <div className="text-success fw-bold text-center mb-2">
-                      🎉 Congrats! Goal completed!
-                    </div>
-                  )}
-
-                  <div className="d-flex justify-content-between mt-auto">
-                    <Button
-                      size="sm"
-                      variant="outline-primary"
-                      disabled={achieved}
-                      onClick={() => {
-                        setEditGoal(g);
-                        setGoalForm({
-                          name: g.name,
-                          target_amount: g.target_amount,
-                          category_id: g.category_id,
-                        });
-                        setShowModal(true);
-                      }}
-                    >
-                      <i className="bi bi-pencil me-1"></i> Update
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline-danger"
-                      onClick={() => handleDelete(g.id)}
-                    >
-                      <i className="bi bi-trash me-1"></i> Delete
-                    </Button>
+                  <div className="d-flex justify-content-between mt-4">
+                    <Placeholder.Button variant="outline-primary" xs={5} />
+                    <Placeholder.Button variant="outline-danger" xs={5} />
                   </div>
                 </Card.Body>
               </Card>
             </Col>
-          );
-        })}
-      </Row>
+          ))}
+        </Row>
+      ) : (
+        <Row>
+          {goals.length === 0 ? (
+            <p className="text-muted text-center mt-4">
+              No goals yet. Click <b>Add Goal</b> to start saving!
+            </p>
+          ) : (
+            goals.map((g) => {
+              const progress = g.target_amount
+                ? Math.min(100, ((g.current_amount ?? 0) / g.target_amount) * 100)
+                : 0;
+              const achieved = progress >= 100;
 
-      {/* Modal Add/Edit Goal */}
-      <Modal show={showModal} onHide={() => setShowModal(false)} centered size="lg" backdrop="static">
+              return (
+                <Col md={6} lg={4} key={g.id} className="mb-4">
+                  <Card
+                    className="goal-card border-0 shadow-sm h-100"
+                    style={{
+                      borderRadius: "12px",
+                      backgroundColor: "#ffffff",
+                      borderLeft: achieved ? "4px solid #10b981" : "4px solid #3b82f6",
+                      minHeight: "280px"
+                    }}
+                  >
+                    <Card.Body className="d-flex flex-column p-4">
+                      {/* Header with name & category */}
+                      <div className="d-flex justify-content-between align-items-start mb-3">
+                        <h5 className="fw-bold mb-0 text-dark">{g.name}</h5>
+                        <span className="badge bg-secondary bg-opacity-10 text-dark px-2 py-1">
+                          {g.category?.name || "Saving"}
+                        </span>
+                      </div>
+
+                      {/* Target & Saved Amount */}
+                      <div className="mb-3">
+                        <div className="d-flex justify-content-between mb-2">
+                          <span className="text-muted" style={{ fontSize: '0.9rem' }}>
+                            <i className="bi bi-bullseye me-1"></i>Target
+                          </span>
+                          <span className="fw-semibold text-dark">
+                            {formatCurrency(g.target_amount ?? 0)}
+                          </span>
+                        </div>
+                        <div className="d-flex justify-content-between">
+                          <span className="text-muted" style={{ fontSize: '0.9rem' }}>
+                            <i className="bi bi-piggy-bank me-1"></i>Saved
+                          </span>
+                          <span className="fw-semibold text-success">
+                            {formatCurrency(g.current_amount ?? 0)}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Progress Bar */}
+                      <div className="mb-3">
+                        <div className="d-flex justify-content-between mb-1">
+                          <span className="small text-muted">Progress</span>
+                          <span className="small fw-semibold">
+                            {progress.toFixed(1)}%
+                          </span>
+                        </div>
+                        <ProgressBar
+                          now={progress}
+                          variant={achieved ? "success" : "info"}
+                          style={{ height: "12px", borderRadius: "6px" }}
+                        />
+                      </div>
+
+                      {/* Achievement Badge */}
+                      {achieved && (
+                        <div className="alert alert-success text-center py-2 mb-3" role="alert">
+                          <i className="bi bi-trophy-fill me-2"></i>
+                          <strong>Goal Achieved!</strong>
+                        </div>
+                      )}
+
+                      {/* Action Buttons */}
+                      <div className="d-flex gap-2 mt-auto">
+                        <Button
+                          size="sm"
+                          variant="outline-primary"
+                          disabled={achieved}
+                          onClick={() => {
+                            setEditGoal(g);
+                            setGoalForm({
+                              name: g.name,
+                              target_amount: g.target_amount,
+                              category_id: g.category_id,
+                            });
+                            setShowModal(true);
+                          }}
+                          className="flex-fill"
+                        >
+                          <i className="bi bi-pencil-square me-1"></i> Edit
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline-danger"
+                          onClick={() => handleDelete(g.id)}
+                          className="flex-fill"
+                        >
+                          <i className="bi bi-trash3 me-1"></i> Delete
+                        </Button>
+                      </div>
+                    </Card.Body>
+                  </Card>
+                </Col>
+              );
+            })
+          )}
+        </Row>
+      )}
+
+      <Modal
+        show={showModal}
+        onHide={() => setShowModal(false)}
+        centered
+        size="lg"
+        backdrop="static"
+      >
         <Card className="shadow-lg border-0">
           <Card.Header className="bg-primary text-white border-0 d-flex justify-content-between align-items-center">
-            <h5 className="mb-0">
-              <i className={`bi ${editGoal ? "bi-pencil" : "bi-plus-lg"} me-2`}></i>
+            <h6 className="mb-0 fw-semibold">
+              <i
+                className={`bi ${
+                  editGoal ? "bi-pencil" : "bi-plus-lg"
+                } me-2`}
+              ></i>
               {editGoal ? "Edit Goal" : "Add Goal"}
-            </h5>
-            <Button variant="link" className="text-white p-0" onClick={() => setShowModal(false)}>
-              <i className="bi bi-x-lg fs-4"></i>
+            </h6>
+            <Button
+              variant="link"
+              className="text-white p-0"
+              onClick={() => setShowModal(false)}
+            >
+              <i className="bi bi-x-lg fs-5"></i>
             </Button>
           </Card.Header>
           <Card.Body className="p-4">
@@ -228,7 +309,10 @@ export default function ProgressGoals() {
                       placeholder="e.g. 200000000"
                       value={goalForm.target_amount}
                       onChange={(e) =>
-                        setGoalForm({ ...goalForm, target_amount: e.target.value })
+                        setGoalForm({
+                          ...goalForm,
+                          target_amount: e.target.value,
+                        })
                       }
                       required
                     />
@@ -255,7 +339,10 @@ export default function ProgressGoals() {
               </Form.Group>
 
               <div className="d-flex justify-content-end gap-2 mt-4">
-                <Button variant="outline-secondary" onClick={() => setShowModal(false)}>
+                <Button
+                  variant="outline-secondary"
+                  onClick={() => setShowModal(false)}
+                >
                   Cancel
                 </Button>
                 <Button type="submit" variant="primary">
@@ -266,7 +353,6 @@ export default function ProgressGoals() {
           </Card.Body>
         </Card>
       </Modal>
-      <ToastContainer position="top-right" autoClose={3000} hideProgressBar />
     </Container>
   );
 }

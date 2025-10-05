@@ -35,23 +35,26 @@ export function AuthProvider({ children }) {
     }
   };
 
-  // Login
-  const login = async (email, password) => {
-    try {
-      const res = await api.post("/login", { email, password });
-      const newToken = res.data.token;
-      setToken(newToken);
-      localStorage.setItem("token", newToken);
-      api.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
-      setUser(res.data.user); // atau res.data jika backend return user object langsung
-      return { success: true };
-    } catch (err) {
-      return {
-        success: false,
-        message: err.response?.data?.error || "Login failed",
-      };
-    }
-  };
+ // Login
+const login = async (email, password) => {
+  try {
+    // Hapus token lama dulu sebelum login
+    delete api.defaults.headers.common['Authorization'];
+    
+    const res = await api.post("/login", { email, password });
+    const newToken = res.data.token;
+    setToken(newToken);
+    localStorage.setItem("token", newToken);
+    api.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
+    setUser(res.data.user);
+    return { success: true };
+  } catch (err) {
+    return {
+      success: false,
+      message: err.response?.data?.error || err.response?.data?.message || "Login failed",
+    };
+  }
+};
 
   // Register
   const register = async (name, email, password, password_confirmation) => {
