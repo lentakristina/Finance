@@ -25,13 +25,12 @@ class CategoryController extends Controller
     }
 
     // Update kategori
-    public function update(Request $request, $id)
+    public function update(Request $request, $category)
 {
-    $category = Category::findOrFail($id);
-    $category->update($request->all());
-    return response()->json($category);
+    $cat = Category::findOrFail($category);
+    $cat->update($request->all());
+    return response()->json($cat);
 }
-
     // Hapus kategori
     public function destroy($id)
     {
