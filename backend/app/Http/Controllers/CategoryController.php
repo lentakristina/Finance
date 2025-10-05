@@ -26,11 +26,11 @@ class CategoryController extends Controller
 
     // Update kategori
     public function update(Request $request, $id)
-    {
-        $category = Category::findOrFail($id);
-        $category->update($request->all());
-        return $category;
-    }
+{
+    $category = Category::findOrFail($id);
+    $category->update($request->all());
+    return response()->json($category);
+}
 
     // Hapus kategori
     public function destroy($id)
