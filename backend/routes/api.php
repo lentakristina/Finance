@@ -22,10 +22,8 @@ Route::group(['middleware' => ['jwt.auth']], function () {
     Route::get('/me', [AuthController::class, 'me']);
 
     // Categories
-    Route::get('/categories', [CategoryController::class, 'index']);
-    Route::post('/categories', [CategoryController::class, 'store']); 
-    Route::put('/categories/{id}', [CategoryController::class, 'update']);
-    Route::delete('/categories/{id}', [CategoryController::class, 'destroy']);
+   // Categories - ubah jadi apiResource
+   Route::apiResource('categories', CategoryController::class);
 
 
     // Goals
