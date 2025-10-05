@@ -1,23 +1,19 @@
 <?php
 
 return [
+    'paths' => ['api/*', 'login', 'register', 'logout', 'refresh', 'me'],
 
-        'paths' => ['api/*', 'login', 'register', 'logout', 'refresh', 'me'],
+    'allowed_methods' => ['*'],
 
-        'allowed_methods' => ['*'],
+    'allowed_origins' => ['*'], // ✅ izinkan semua origin (untuk testing)
 
-        'allowed_origins' => [
-            'http://localhost:3000', // ✅ izinkan React dev server
-        ],
+    'allowed_origins_patterns' => [],
 
-        'allowed_origins_patterns' => [],
+    'allowed_headers' => ['*'],
 
-        'allowed_headers' => ['*'],
+    'exposed_headers' => [],
 
-        'exposed_headers' => [],
+    'max_age' => 0,
 
-        'max_age' => 0,
-
-        'supports_credentials' => false,
-
+    'supports_credentials' => false,
 ];
