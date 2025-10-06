@@ -5,7 +5,10 @@ return [
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => ['*'], // ✅ izinkan semua origin (untuk testing)
+    'allowed_origins' => [
+    'http://localhost:3000',
+    'https://finance-ashen-psi.vercel.app', // tambahkan ini
+],
 
     'allowed_origins_patterns' => [],
 
