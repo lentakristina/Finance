@@ -17,6 +17,7 @@ const Register = () => {
   const navigate = useNavigate();
 
   if (isAuthenticated) {
+    console.log("🔁 Authenticated, redirecting to dashboard...");
     return <Navigate to="/dashboard" replace />;
   }
 
@@ -47,7 +48,7 @@ const Register = () => {
     );
 
     if (result.success) {
-      navigate('/', { replace: true });
+      navigate('/dashboard', { replace: true });
     } else {
       setErrors({ general: result.message });
     }

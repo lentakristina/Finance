@@ -11,7 +11,6 @@ class TransactionSeeder extends Seeder
 {
     public function run(): void
     {
-        // Ambil user pertama yang ada, atau buat user baru
         $user = User::first();
         
         if (!$user) {
@@ -26,7 +25,7 @@ class TransactionSeeder extends Seeder
 
         for ($i = 1; $i <= 20; $i++) {
             $transactions[] = [
-                'user_id' => $user->id,  // ← TAMBAHKAN INI
+                'user_id' => $user->id,  
                 'category_id' => rand(1, 9),
                 'amount' => rand(50000, 5000000),
                 'date' => Carbon::now()->subDays(rand(0, 30))->format('Y-m-d'),

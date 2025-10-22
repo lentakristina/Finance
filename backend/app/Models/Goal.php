@@ -13,7 +13,7 @@ class Goal extends Model
         'user_id',
         'name',
         'target_amount',
-        'current_amount', // pastikan ini ada
+        'current_amount', 
         'category_id'
     ];
 

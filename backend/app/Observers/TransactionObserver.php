@@ -14,7 +14,7 @@ class TransactionObserver
 
     public function updated(Transaction $transaction)
     {
-        // Update goal lama dan baru jika goal_id berubah
+        // Update old and new goals if goal_id changes
         if ($transaction->isDirty('goal_id')) {
             $oldGoalId = $transaction->getOriginal('goal_id');
             if ($oldGoalId) {
@@ -41,7 +41,7 @@ class TransactionObserver
         $goal = Goal::find($goalId);
         if ($goal) {
             $goal->current_amount = Transaction::where('goal_id', $goalId)->sum('amount');
-            $goal->saveQuietly(); // Hindari infinite loop
+            $goal->saveQuietly(); 
         }
     }
 }

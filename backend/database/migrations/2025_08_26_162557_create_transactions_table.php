@@ -13,9 +13,9 @@ return new class extends Migration
             $table->unsignedBigInteger('user_id');
             $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
             $table->foreignId('category_id')->constrained('categories')->onDelete('cascade');
-            $table->decimal('amount', 15, 2); // jumlah uang
-            $table->date('date'); // tanggal transaksi
-            $table->string('note')->nullable(); // keterangan opsional
+            $table->decimal('amount', 15, 2); 
+            $table->date('date'); 
+            $table->string('note')->nullable(); 
             $table->timestamps();
         });
     }

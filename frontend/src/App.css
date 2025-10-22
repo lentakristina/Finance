@@ -10,7 +10,7 @@
   border-radius: 0 0 12px 12px;
   position: sticky;
   top: 0;
-  z-index: 1500; /* biar tetep di atas konten */
+  z-index: 1500; 
 }
 
 /* Brand */
@@ -71,7 +71,7 @@
   bottom: 0;
   width: 0%;
   height: 2px;
-  background: #2e7d32; /* hijau tua modern look */
+  background: #2e7d32; 
   transition: width 0.3s ease;
 }
 

@@ -9,9 +9,6 @@ use Illuminate\Support\Facades\Validator;
 
 class AuthController extends Controller
 {
-    /**
-     * Login user and return JWT token
-     */
     public function login(Request $request)
     {
         // Validasi input
@@ -27,17 +24,17 @@ class AuthController extends Controller
             ], 422);
         }
 
-        // Ambil kredensial
+        // Get credentials
         $credentials = $request->only('email', 'password');
 
-        // Coba authenticate dengan JWT
+        // Try authenticating with JWT
         if (!$token = auth()->attempt($credentials)) {
             return response()->json([
                 'error' => 'Invalid credentials'
             ], 401);
         }
 
-        // Return token jika berhasil
+        // Return token if successful
         return $this->respondWithToken($token);
     }
 
@@ -62,7 +59,7 @@ class AuthController extends Controller
         $user = \App\Models\User::create([
             'name' => $request->name,
             'email' => $request->email,
-            'password' => bcrypt($request->password), // PENTING: Hash password!
+            'password' => bcrypt($request->password),
         ]);
 
         $token = auth()->login($user);

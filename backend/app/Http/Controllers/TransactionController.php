@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Log;
 class TransactionController extends Controller
 {
     // ===========================
-    // Ambil semua transaksi user
+    // Get all user transactions
     // ===========================
     public function index()
     {
@@ -30,7 +30,7 @@ class TransactionController extends Controller
     }
 
     // ===========================
-    // Detail transaksi
+    // Transaction details
     // ===========================
     public function show($id)
     {
@@ -47,7 +47,7 @@ class TransactionController extends Controller
     }
 
     // ===========================
-    // Create transaksi
+    // Create Transaction 
     // ===========================
     public function store(Request $request)
     {
@@ -65,7 +65,7 @@ class TransactionController extends Controller
 
             DB::beginTransaction();
 
-            // ✅ Validasi goal ownership jika ada goal_id
+            // Validate goal ownership if there is a goal_id
             if (!empty($validated['goal_id'])) {
                 $goalExists = Goal::where('id', $validated['goal_id'])
                     ->where('user_id', $userId)
@@ -87,7 +87,7 @@ class TransactionController extends Controller
 
             $transaction->load('category');
 
-            // ✅ Handle saving category dengan goal
+            // Manage savings categories by purpose
             if ($transaction->goal_id && $transaction->category->type === 'saving') {
                 $goal = Goal::lockForUpdate()->find($transaction->goal_id);
                 
@@ -107,7 +107,7 @@ class TransactionController extends Controller
                         'input_amount' => $transaction->amount
                     ]);
 
-                    // ✅ Validasi
+                    // Validation
                     if ($transaction->amount > $available) {
                         DB::rollBack();
                         return response()->json([
@@ -115,7 +115,7 @@ class TransactionController extends Controller
                         ], 422);
                     }
 
-                    // ✅ Update goal dengan nilai final
+                    // Update goal with final value
                     $goal->current_amount = $currentFromDB + $transaction->amount;
                     $goal->save();
 
@@ -126,7 +126,7 @@ class TransactionController extends Controller
                         'is_completed' => $currentFromDB >= $goal->target_amount
                     ]);
 
-                    // ✅ Create savings log
+                    // Create savings log
                     SavingsLog::create([
                         'transaction_id' => $transaction->id,
                         'goal_id' => $goal->id,
@@ -150,7 +150,7 @@ class TransactionController extends Controller
     }
 
     // ===========================
-    // Update transaksi
+    // Transaction update
     // ===========================
     public function update(Request $request, $id)
     {
@@ -163,7 +163,7 @@ class TransactionController extends Controller
                 ->with('category')
                 ->firstOrFail();
 
-            // Simpan nilai lama
+            // Save old value
             $oldAmount = $transaction->amount;
             $oldGoalId = $transaction->goal_id;
             $oldCategoryType = $transaction->category->type;
@@ -176,7 +176,7 @@ class TransactionController extends Controller
                 'goal_id' => 'nullable|exists:goals,id'
             ]);
 
-            // ✅ Validasi goal ownership jika ada goal_id baru
+            // Validate goal ownership if there is a new goal_id
             if (!empty($validated['goal_id'])) {
                 $goalExists = Goal::where('id', $validated['goal_id'])
                     ->where('user_id', $userId)
@@ -189,12 +189,12 @@ class TransactionController extends Controller
 
             DB::beginTransaction();
 
-            // STEP 1: Rollback old goal jika saving
+            // STEP 1: Rollback old goal if saving
             if ($oldGoalId && $oldCategoryType === 'saving') {
                 SavingsLog::where('transaction_id', $transaction->id)->delete();
             }
 
-            // STEP 2: Update transaksi
+            // STEP 2: Transaction update
             $transaction->update([
                 'date' => $validated['date'],
                 'category_id' => (int)$validated['category_id'],
@@ -205,20 +205,20 @@ class TransactionController extends Controller
 
             $transaction->load(['category', 'goal']);
 
-            // STEP 3: Update goal baru jika kategori saving
+            // STEP 3: Update new goal if saving category
             $newGoalId = $transaction->goal_id;
             $newCategoryType = $transaction->category->type;
 
             if ($newGoalId && $newCategoryType === 'saving') {
                 $goal = Goal::lockForUpdate()->find($newGoalId);
                 if ($goal) {
-                    // ✅ Hitung ulang dari semua transaksi
+                    // Recalculate from all transactions
                     $calculatedCurrent = Transaction::where('goal_id', $goal->id)
                         ->sum('amount');
                     
                     $available = $goal->target_amount - $calculatedCurrent;
 
-                    // ✅ Validasi tidak boleh melebihi target
+                    // Validation must not exceed the target
                     if ($calculatedCurrent > $goal->target_amount) {
                         DB::rollBack();
                         return response()->json([
@@ -226,11 +226,11 @@ class TransactionController extends Controller
                         ], 422);
                     }
 
-                    // ✅ Update goal
+                    // Update goal
                     $goal->current_amount = $calculatedCurrent;
                     $goal->save();
 
-                    // ✅ Create savings log baru
+                    // Create a new savings log
                     SavingsLog::create([
                         'transaction_id' => $transaction->id,
                         'goal_id' => $goal->id,
@@ -269,7 +269,7 @@ class TransactionController extends Controller
         if (!$userId) return response()->json(['message' => 'Unauthorized'], 401);
 
         try {
-            // ✅ Load category sebelum cek type
+            // ✅ Load category 
             $transaction = Transaction::with('category')
                 ->where('id', $id)
                 ->where('user_id', $userId)
@@ -277,14 +277,14 @@ class TransactionController extends Controller
 
             DB::beginTransaction();
 
-            // ✅ Rollback goal jika tipe saving
+            // Rollback goal if saving type
             if ($transaction->goal_id && $transaction->category && $transaction->category->type === 'saving') {
                 $goal = Goal::lockForUpdate()->find($transaction->goal_id);
                 if ($goal) {
-                    // ✅ Hapus savings log dulu
+                    // Delete savings log 
                     SavingsLog::where('transaction_id', $transaction->id)->delete();
                     
-                    // ✅ Recalculate current_amount
+                    // Recalculate current_amount
                     $goal->current_amount = Transaction::where('goal_id', $goal->id)
                         ->where('id', '!=', $transaction->id)
                         ->sum('amount');
@@ -293,7 +293,6 @@ class TransactionController extends Controller
                 }
             }
 
-            // Hapus transaksi
             $transaction->delete();
 
             DB::commit();
@@ -306,7 +305,7 @@ class TransactionController extends Controller
     }
 
     // ===========================
-    // Summary 3 bulan terakhir
+    // Summary of the last 3 months
     // ===========================
         public function summary()
     {
@@ -339,7 +338,7 @@ class TransactionController extends Controller
 
 
         // ===========================
-        // Summary bulan ini
+        // This month's summary
         // ===========================
         public function summaryCurrent()
         {
@@ -365,7 +364,7 @@ class TransactionController extends Controller
         }
 
         // ===========================
-        // Insight pertumbuhan & top category
+        // Growth insights & top categories
         // ===========================
         public function insight()
         {
@@ -373,7 +372,7 @@ class TransactionController extends Controller
             if (!$userId) return response()->json(['error' => 'Unauthorized'], 401);
 
             try {
-                // Total EXPENSE bulan ini
+                // Total EXPENSES this month
                 $currentMonth = DB::table('transactions')
                     ->join('categories', 'transactions.category_id', '=', 'categories.id')
                     ->where('transactions.user_id', $userId)
@@ -383,7 +382,7 @@ class TransactionController extends Controller
                     ->selectRaw("COALESCE(SUM(transactions.amount), 0) as total")
                     ->first();
 
-                // Total EXPENSE bulan lalu
+                // Total EXPENSES last month
                 $lastMonth = DB::table('transactions')
                     ->join('categories', 'transactions.category_id', '=', 'categories.id')
                     ->where('transactions.user_id', $userId)
@@ -401,7 +400,7 @@ class TransactionController extends Controller
                     $growth = 100;
                 }
 
-                // Top category bulan ini dengan amount
+                // Top category this month by amount
                 $topCategoryThisMonth = DB::table('transactions')
                     ->join('categories', 'transactions.category_id', '=', 'categories.id')
                     ->where('transactions.user_id', $userId)
@@ -413,7 +412,7 @@ class TransactionController extends Controller
                     ->orderByDesc('total')
                     ->first();
 
-                // Top category bulan lalu dengan amount
+                // Top category last month by amount
                 $topCategoryLastMonth = DB::table('transactions')
                     ->join('categories', 'transactions.category_id', '=', 'categories.id')
                     ->where('transactions.user_id', $userId)

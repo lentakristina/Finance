@@ -7,13 +7,12 @@ use Illuminate\Http\Request;
 
 class CategoryController extends Controller
 {
-    // Ambil semua kategori (shared)
     public function index()
     {
         return Category::all();
     }
 
-    // Tambah kategori baru
+    // Add a new category
     public function store(Request $request)
     {
         $request->validate([
@@ -24,14 +23,14 @@ class CategoryController extends Controller
         return Category::create($request->all());
     }
 
-    // Update kategori
+    // Update category
     public function update(Request $request, $category)
 {
     $cat = Category::findOrFail($category);
     $cat->update($request->all());
     return response()->json($cat);
 }
-    // Hapus kategori
+    // Hapus category
     public function destroy($id)
     {
         return Category::destroy($id);

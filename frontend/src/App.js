@@ -11,7 +11,7 @@ import { useAuth } from "./context/AuthContext";
 import "bootstrap/dist/css/bootstrap.min.css";
 
 function App() {
-  const { user, logout, loading } = useAuth();
+  const { user, token, isAuthenticated, logout, loading } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -99,11 +99,11 @@ function App() {
 
       <div className="content">
         <Routes>
-          <Route path="/login" element={!user ? <Login /> : <Navigate to="/" />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/" element={user ? <Dashboard /> : <Navigate to="/login" />} />
-          <Route path="/transactions" element={user ? <Transactions /> : <Navigate to="/login" />} />
-          <Route path="/goals" element={user ? <ProgressGoals /> : <Navigate to="/login" />} />
+           <Route path="/login" element={!isAuthenticated ? <Login /> : <Navigate to="/" />} />
+           <Route path="/register" element={!isAuthenticated ? <Register /> : <Navigate to="/" />} />
+           <Route path="/" element={isAuthenticated ? <Dashboard /> : <Navigate to="/login" />} />
+           <Route path="/transactions" element={isAuthenticated ? <Transactions /> : <Navigate to="/login" />} />
+           <Route path="/goals" element={isAuthenticated ? <ProgressGoals /> : <Navigate to="/login" />} />
         </Routes>
       </div>
     </div>

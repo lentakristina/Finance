@@ -16,13 +16,13 @@ class SavingsLog extends Model
         'amount'
     ];
     
-    // Relasi ke Goal
+    // Relationship to Goal
     public function goal()
     {
         return $this->belongsTo(Goal::class);
     }
 
-    // Relasi ke Transaction
+    // Relationship to Transaction
     public function transaction()
     {
         return $this->belongsTo(Transaction::class);

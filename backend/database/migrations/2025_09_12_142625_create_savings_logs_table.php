@@ -15,12 +15,12 @@ return new class extends Migration
             $table->decimal('amount', 15, 2);
             $table->timestamps();
 
-            // foreign key ke tabel transactions
+            // foreign key -> transactions table
             $table->foreign('transaction_id')
                   ->references('id')->on('transactions')
                   ->onDelete('cascade');
 
-            // foreign key ke tabel goals
+            // foreign key -> goals table
             $table->foreign('goal_id')
                   ->references('id')->on('goals')
                   ->onDelete('cascade');

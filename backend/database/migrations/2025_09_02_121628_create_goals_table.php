@@ -17,8 +17,8 @@ public function up()
         $table->decimal('target_amount', 15, 2);
         $table->decimal('current_amount', 15, 2)->default(0);
         $table->unsignedBigInteger('category_id')->nullable();
-        $table->integer('priority')->nullable(); // buat urutan goal
-        $table->decimal('allocation_pct', 5, 2)->nullable(); // buat weighted %
+        $table->integer('priority')->nullable(); 
+        $table->decimal('allocation_pct', 5, 2)->nullable(); 
         $table->timestamps();
 
         $table->foreign('category_id')->references('id')->on('categories')->onDelete('cascade');

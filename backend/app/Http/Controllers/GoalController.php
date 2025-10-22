@@ -13,7 +13,6 @@ class GoalController extends Controller
         return response()->json($goals);
     }
 
-    // ✅ BENAR
     public function store(Request $request)
 {
     $userId = auth()->id();
@@ -29,7 +28,7 @@ class GoalController extends Controller
         'user_id' => $userId,
         'name' => $validated['name'],
         'target_amount' => $validated['target_amount'],
-        'current_amount' => 0, // ✅ SELALU 0 untuk goal baru
+        'current_amount' => 0, 
         'category_id' => $validated['category_id']
     ]);
 

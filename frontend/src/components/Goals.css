@@ -1,4 +1,4 @@
-/* Konsisten dengan transaction page */
+/* ================= Goals Component Styles ================= */
 .goals-container,
 .transaction-container {
   max-width: 1100px;
@@ -6,7 +6,6 @@
   padding-bottom: 3rem;
 }
 
-/* Title biar sama kayak Transaction */
 .goals-container h3 {
   font-weight: 600;
   color: #1e293b;
@@ -14,7 +13,7 @@
   margin-bottom: 1rem;
 }
 
-/* Kartu goals lebih compact */
+/* ================= Card Styles ================= */
 .goal-card {
   border: 1px solid rgba(0, 123, 255, 0.15);
   border-radius: 14px;
@@ -30,8 +29,7 @@
   box-shadow: 0 10px 25px rgba(0, 123, 255, 0.12);
 }
 
-
-/* Header kecil dikit biar proporsional */
+/* ================= Header (Title & Type)  ================= */
 .goal-header h5 {
   font-size: 1rem;
   font-weight: 600;
@@ -44,7 +42,7 @@
   color: #777;
 }
 
-/* Progress bar & teks */
+/* ================= Progress bar & teks ================= */
 .progress {
   height: 10px;
   border-radius: 10px;
@@ -60,8 +58,7 @@
   border-radius: 10px;
 }
 
-
-/* Info bar (Target dan Saved) */
+/* ================= Info bar ================= */
 .goal-info {
   display: flex;
   justify-content: space-between;
@@ -74,8 +71,7 @@
   margin-bottom: 0.8rem;
 }
 
-
-/* Buttons */
+/* ================= Buttons ================= */
 .goal-actions {
   display: flex;
   justify-content: flex-end;
@@ -112,8 +108,7 @@
   color: white;
 }
 
-
-/* Add button style */
+/* ================= Add button style ================= */
 .btn-add {
   background-color: #007bff;
   border: none;

@@ -11,12 +11,12 @@ class SavingsLogSeeder extends Seeder
 {
     public function run(): void
     {
-        // ambil 1 transaksi saving
+        // take 1 savings transaction
         $transaction = Transaction::whereHas('category', function ($q) {
             $q->where('type', 'saving');
         })->first();
 
-        // ambil semua goals
+        // take all goals
         $goals = Goal::all();
 
         if ($transaction && $goals->count() > 0) {
@@ -26,8 +26,7 @@ class SavingsLogSeeder extends Seeder
             if ($amount <= 0) break;
 
             $needed = $goal->target_amount - $goal->current_amount;
-            if ($needed <= 0) continue; // goal sudah tercapai
-
+            if ($needed <= 0) continue; // the goal has been achieved
             $allocate = min($amount, $needed);
 
             SavingsLog::create([
@@ -36,7 +35,7 @@ class SavingsLogSeeder extends Seeder
                 'amount'         => $allocate,
             ]);
 
-            // update goal dari logs
+            // update goal from logs
             $goal->increment('current_amount', $allocate);
 
             $amount -= $allocate;

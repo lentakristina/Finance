@@ -9,7 +9,6 @@ return new class extends Migration
     public function up()
     {
         Schema::table('goals', function (Blueprint $table) {
-            // tambahkan kolom user_id, foreign key ke tabel users
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
         });
     }

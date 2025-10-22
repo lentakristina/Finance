@@ -2,7 +2,7 @@
 
 namespace App\Providers;
 
-use Illuminate\Support\ServiceProvider; // ← ini WAJIB ada
+use Illuminate\Support\ServiceProvider; 
 use App\Models\Transaction;
 use App\Observers\TransactionObserver;
 

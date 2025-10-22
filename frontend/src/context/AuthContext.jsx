@@ -65,7 +65,7 @@ const login = async (email, password) => {
       setToken(newToken);
       localStorage.setItem("token", newToken);
       api.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
-      setUser(res.data.user); // atau res.data jika backend return user object langsung
+      setUser(res.data.user); 
       return { success: true };
     } catch (err) {
       return {
@@ -88,7 +88,7 @@ const login = async (email, password) => {
     user,
     token,
     loading,
-    isAuthenticated: !!user,
+    isAuthenticated: !!token,
     login,
     register,
     logout,
