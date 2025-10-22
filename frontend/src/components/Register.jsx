@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Container, Card, Form, Button, Alert, Spinner } from 'react-bootstrap';
-import { Link, Navigate } from 'react-router-dom';
+import { Link, Navigate , useNavigate } from 'react-router-dom';
 import { useAuth } from "../context/AuthContext";
 
 
@@ -14,6 +14,7 @@ const Register = () => {
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const { register, isAuthenticated } = useAuth();
+  const navigate = useNavigate();
 
   if (isAuthenticated) {
     return <Navigate to="/dashboard" replace />;
@@ -44,9 +45,11 @@ const Register = () => {
       formData.password,
       formData.password_confirmation
     );
-    
-    if (!result.success) {
-      setErrors(result.errors);
+
+    if (result.success) {
+      navigate('/', { replace: true });
+    } else {
+      setErrors({ general: result.message });
     }
     
     setLoading(false);

@@ -10,8 +10,8 @@ return new class extends Migration
     {
         Schema::create('categories', function (Blueprint $table) {
             $table->id();
-            $table->string('name'); // contoh: Food, Transport, Salary
-            $table->enum('type', ['income', 'expense']); // biar bisa bedain kategori
+            $table->string('name'); 
+            $table->enum('type', ['income', 'expense', 'saving']); 
             $table->timestamps();
         });
     }

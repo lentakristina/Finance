@@ -46,94 +46,108 @@ class TransactionController extends Controller
         }
     }
 
- public function store(Request $request)
-{
-    $userId = auth()->id();
-    if (!$userId) return response()->json(['message' => 'Unauthorized'], 401);
+    // ===========================
+    // Create transaksi
+    // ===========================
+    public function store(Request $request)
+    {
+        $userId = auth()->id();
+        if (!$userId) return response()->json(['message' => 'Unauthorized'], 401);
 
-    try {
-        $validated = $request->validate([
-            'date' => 'required|date',
-            'category_id' => 'required|exists:categories,id',
-            'amount' => 'required|numeric|min:0.01',
-            'note' => 'nullable|string|max:255',
-            'goal_id' => 'nullable|exists:goals,id'
-        ]);
+        try {
+            $validated = $request->validate([
+                'date' => 'required|date',
+                'category_id' => 'required|exists:categories,id',
+                'amount' => 'required|numeric|min:0.01',
+                'note' => 'nullable|string|max:255',
+                'goal_id' => 'nullable|exists:goals,id'
+            ]);
 
-        DB::beginTransaction();
+            DB::beginTransaction();
 
-        $transaction = Transaction::create([
-            'user_id' => $userId,
-            'date' => $validated['date'],
-            'category_id' => $validated['category_id'],
-            'amount' => $validated['amount'],
-            'note' => $validated['note'] ?? null,
-            'goal_id' => $validated['goal_id'] ?? null
-        ]);
-
-        $transaction->load('category');
-
-        if ($transaction->goal_id && $transaction->category->type === 'saving') {
-            $goal = Goal::lockForUpdate()->find($transaction->goal_id);
-            
-            if ($goal) {
-                // ✅ Hitung dari transaksi (source of truth)
-                $calculatedCurrent = Transaction::where('goal_id', $goal->id)
-                    ->where('id', '!=', $transaction->id) // Exclude transaksi baru
-                    ->sum('amount');
+            // ✅ Validasi goal ownership jika ada goal_id
+            if (!empty($validated['goal_id'])) {
+                $goalExists = Goal::where('id', $validated['goal_id'])
+                    ->where('user_id', $userId)
+                    ->exists();
                 
-                $available = $goal->target_amount - $calculatedCurrent;
-
-                Log::info('Goal validation', [
-                    'goal_id' => $goal->id,
-                    'goal_name' => $goal->name,
-                    'target' => $goal->target_amount,
-                    'current_calculated' => $calculatedCurrent,
-                    'available' => $available,
-                    'input_amount' => $transaction->amount
-                ]);
-
-                // ✅ Validasi
-                if ($transaction->amount > $available) {
-                    DB::rollBack();
-                    return response()->json([
-                        'message' => "Amount melebihi sisa target goal '{$goal->name}'. Maksimum: " . number_format($available, 0, ',', '.')
-                    ], 422);
+                if (!$goalExists) {
+                    return response()->json(['message' => 'Goal not found or unauthorized'], 403);
                 }
-
-                // ✅ Update dengan nilai calculated + input baru
-                $newCurrent = $calculatedCurrent + $transaction->amount;
-                $goal->current_amount = $newCurrent;
-                $goal->save();
-
-                Log::info('Goal updated', [
-                    'goal_id' => $goal->id,
-                    'new_current_amount' => $newCurrent,
-                    'target' => $goal->target_amount,
-                    'is_completed' => $newCurrent >= $goal->target_amount
-                ]);
-
-                SavingsLog::create([
-                    'transaction_id' => $transaction->id,
-                    'goal_id' => $goal->id,
-                    'user_id' => $userId,
-                    'amount' => $transaction->amount,
-                ]);
             }
+
+            $transaction = Transaction::create([
+                'user_id' => $userId,
+                'date' => $validated['date'],
+                'category_id' => $validated['category_id'],
+                'amount' => $validated['amount'],
+                'note' => $validated['note'] ?? null,
+                'goal_id' => $validated['goal_id'] ?? null
+            ]);
+
+            $transaction->load('category');
+
+            // ✅ Handle saving category dengan goal
+            if ($transaction->goal_id && $transaction->category->type === 'saving') {
+                $goal = Goal::lockForUpdate()->find($transaction->goal_id);
+                
+                if ($goal) {
+                    $currentFromDB = Transaction::where('goal_id', $goal->id)
+                        ->where('id', '!=', $transaction->id)
+                        ->sum('amount');
+                    
+                    $available = $goal->target_amount - $currentFromDB;
+
+                    Log::info('Goal validation', [
+                        'goal_id' => $goal->id,
+                        'goal_name' => $goal->name,
+                        'target' => $goal->target_amount,
+                        'current_from_db' => $currentFromDB,
+                        'available' => $available,
+                        'input_amount' => $transaction->amount
+                    ]);
+
+                    // ✅ Validasi
+                    if ($transaction->amount > $available) {
+                        DB::rollBack();
+                        return response()->json([
+                            'message' => "Amount melebihi sisa target goal '{$goal->name}'. Maksimum: " . number_format($available, 0, ',', '.')
+                        ], 422);
+                    }
+
+                    // ✅ Update goal dengan nilai final
+                    $goal->current_amount = $currentFromDB + $transaction->amount;
+                    $goal->save();
+
+                    Log::info('Goal updated', [
+                        'goal_id' => $goal->id,
+                        'new_current_amount' => $currentFromDB,
+                        'target' => $goal->target_amount,
+                        'is_completed' => $currentFromDB >= $goal->target_amount
+                    ]);
+
+                    // ✅ Create savings log
+                    SavingsLog::create([
+                        'transaction_id' => $transaction->id,
+                        'goal_id' => $goal->id,
+                        //'user_id' => $userId,
+                        'amount' => $transaction->amount,
+                    ]);
+                }
+            }
+
+            DB::commit();
+            
+            return response()->json($transaction->load(['category', 'goal']), 201);
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json(['message' => 'Validation failed', 'errors' => $e->errors()], 422);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Transaction creation failed: ' . $e->getMessage());
+            return response()->json(['message' => 'Failed to create transaction', 'error' => $e->getMessage()], 500);
         }
-
-        DB::commit();
-        
-        return response()->json($transaction->load(['category', 'goal']), 201);
-
-    } catch (\Illuminate\Validation\ValidationException $e) {
-        return response()->json(['message' => 'Validation failed', 'errors' => $e->errors()], 422);
-    } catch (\Exception $e) {
-        DB::rollBack();
-        Log::error('Transaction creation failed: ' . $e->getMessage());
-        return response()->json(['message' => 'Failed to create transaction'], 500);
     }
-}
 
     // ===========================
     // Update transaksi
@@ -162,18 +176,22 @@ class TransactionController extends Controller
                 'goal_id' => 'nullable|exists:goals,id'
             ]);
 
+            // ✅ Validasi goal ownership jika ada goal_id baru
+            if (!empty($validated['goal_id'])) {
+                $goalExists = Goal::where('id', $validated['goal_id'])
+                    ->where('user_id', $userId)
+                    ->exists();
+                
+                if (!$goalExists) {
+                    return response()->json(['message' => 'Goal not found or unauthorized'], 403);
+                }
+            }
+
             DB::beginTransaction();
 
             // STEP 1: Rollback old goal jika saving
             if ($oldGoalId && $oldCategoryType === 'saving') {
-                $oldGoal = Goal::lockForUpdate()->find($oldGoalId);
-                if ($oldGoal) {
-                    $oldGoal->current_amount -= $oldAmount;
-                    if ($oldGoal->current_amount < 0) $oldGoal->current_amount = 0;
-                    $oldGoal->save();
-
-                    SavingsLog::where('transaction_id', $transaction->id)->delete();
-                }
+                SavingsLog::where('transaction_id', $transaction->id)->delete();
             }
 
             // STEP 2: Update transaksi
@@ -187,47 +205,46 @@ class TransactionController extends Controller
 
             $transaction->load(['category', 'goal']);
 
-            // STEP 3: Validasi & update goal BARU jika saving
+            // STEP 3: Update goal baru jika kategori saving
             $newGoalId = $transaction->goal_id;
             $newCategoryType = $transaction->category->type;
 
             if ($newGoalId && $newCategoryType === 'saving') {
                 $goal = Goal::lockForUpdate()->find($newGoalId);
                 if ($goal) {
-                    // Hitung available berdasarkan current_amount yang sudah di-rollback
-                    $available = $goal->target_amount - $goal->current_amount;
+                    // ✅ Hitung ulang dari semua transaksi
+                    $calculatedCurrent = Transaction::where('goal_id', $goal->id)
+                        ->sum('amount');
+                    
+                    $available = $goal->target_amount - $calculatedCurrent;
 
-                    if ($transaction->amount > $available) {
+                    // ✅ Validasi tidak boleh melebihi target
+                    if ($calculatedCurrent > $goal->target_amount) {
                         DB::rollBack();
                         return response()->json([
-                            'message' => "Amount melebihi target goal, maksimum allowed: {$available}",
-                            'debug' => [
-                                'target_amount' => $goal->target_amount,
-                                'current_amount' => $goal->current_amount,
-                                'available' => $available,
-                                'input_amount' => $transaction->amount
-                            ]
+                            'message' => "Total transaksi melebihi target goal. Maksimum allowed: " . number_format($goal->target_amount - ($calculatedCurrent - $transaction->amount), 0, ',', '.')
                         ], 422);
                     }
 
-                    // Cek apakah akan melebihi target setelah ditambahkan
-                    $newTotal = $goal->current_amount + $transaction->amount;
-                    if ($newTotal > $goal->target_amount) {
-                        DB::rollBack();
-                        return response()->json([
-                            'message' => "Total akan melebihi target. Maksimum allowed: {$available}"
-                        ], 422);
-                    }
-
-                    $goal->current_amount += $transaction->amount;
+                    // ✅ Update goal
+                    $goal->current_amount = $calculatedCurrent;
                     $goal->save();
 
+                    // ✅ Create savings log baru
                     SavingsLog::create([
                         'transaction_id' => $transaction->id,
                         'goal_id' => $goal->id,
-                        'user_id' => $userId,
+                        //'user_id' => $userId,
                         'amount' => $transaction->amount,
                     ]);
+                }
+            }
+            
+            if ($oldGoalId && $oldGoalId !== $newGoalId) {
+                $oldGoal = Goal::lockForUpdate()->find($oldGoalId);
+                if ($oldGoal) {
+                    $oldGoal->current_amount = Transaction::where('goal_id', $oldGoalId)->sum('amount');
+                    $oldGoal->save();
                 }
             }
 
@@ -239,10 +256,9 @@ class TransactionController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('Transaction update failed', ['error' => $e->getMessage(), 'transaction_id' => $id]);
-            return response()->json(['message' => 'Failed to update transaction: ' . $e->getMessage()], 500);
+            return response()->json(['message' => 'Failed to update transaction', 'error' => $e->getMessage()], 500);
         }
     }
-
 
     // ===========================
     // Delete transaksi
@@ -253,26 +269,31 @@ class TransactionController extends Controller
         if (!$userId) return response()->json(['message' => 'Unauthorized'], 401);
 
         try {
-            $transaction = Transaction::where('id', $id)
+            // ✅ Load category sebelum cek type
+            $transaction = Transaction::with('category')
+                ->where('id', $id)
                 ->where('user_id', $userId)
                 ->firstOrFail();
 
             DB::beginTransaction();
 
-            // rollback goal jika tipe saving
-            if ($transaction->goal_id && $transaction->category->type === 'saving') {
-                $goal = Goal::find($transaction->goal_id);
+            // ✅ Rollback goal jika tipe saving
+            if ($transaction->goal_id && $transaction->category && $transaction->category->type === 'saving') {
+                $goal = Goal::lockForUpdate()->find($transaction->goal_id);
                 if ($goal) {
-                    $goal->current_amount -= $transaction->amount;
-                    if ($goal->current_amount < 0) $goal->current_amount = 0;
-                    $goal->save();
-
-                    // hapus savings log terkait transaksi
+                    // ✅ Hapus savings log dulu
                     SavingsLog::where('transaction_id', $transaction->id)->delete();
+                    
+                    // ✅ Recalculate current_amount
+                    $goal->current_amount = Transaction::where('goal_id', $goal->id)
+                        ->where('id', '!=', $transaction->id)
+                        ->sum('amount');
+                    
+                    $goal->save();
                 }
             }
 
-            // hapus transaksi
+            // Hapus transaksi
             $transaction->delete();
 
             DB::commit();
@@ -280,15 +301,14 @@ class TransactionController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('Transaction deletion failed', ['error' => $e->getMessage(), 'transaction_id' => $id]);
-            return response()->json(['message' => 'Failed to delete transaction: ' . $e->getMessage()], 500);
+            return response()->json(['message' => 'Failed to delete transaction', 'error' => $e->getMessage()], 500);
         }
     }
-
 
     // ===========================
     // Summary 3 bulan terakhir
     // ===========================
-    public function summary()
+        public function summary()
     {
         $userId = auth()->id();
         if (!$userId) return response()->json(['error' => 'Unauthorized'], 401);
@@ -300,7 +320,8 @@ class TransactionController extends Controller
                     DB::raw("DATE_TRUNC('month', transactions.date) as month_date"),
                     DB::raw("TO_CHAR(DATE_TRUNC('month', transactions.date), 'Mon YYYY') as month"),
                     DB::raw("SUM(CASE WHEN categories.type = 'income' THEN transactions.amount ELSE 0 END) as income"),
-                    DB::raw("SUM(CASE WHEN categories.type = 'expense' THEN transactions.amount ELSE 0 END) as expense")
+                    DB::raw("SUM(CASE WHEN categories.type = 'expense' THEN transactions.amount ELSE 0 END) as expense"),
+                    DB::raw("SUM(CASE WHEN categories.type = 'saving' THEN transactions.amount ELSE 0 END) as saving")
                 )
                 ->where('transactions.user_id', $userId)
                 ->whereNotNull('transactions.date')
@@ -316,76 +337,110 @@ class TransactionController extends Controller
         }
     }
 
-    // ===========================
-    // Summary bulan ini
-    // ===========================
-    public function summaryCurrent()
-    {
-        $userId = auth()->id();
-        if (!$userId) return response()->json(['error' => 'Unauthorized'], 401);
 
-        try {
-            $result = DB::table('transactions')
-                ->leftJoin('categories', 'transactions.category_id', '=', 'categories.id')
-                ->selectRaw("SUM(CASE WHEN categories.type = 'income' THEN transactions.amount ELSE 0 END) as income")
-                ->selectRaw("SUM(CASE WHEN categories.type = 'expense' THEN transactions.amount ELSE 0 END) as expense")
-                ->selectRaw("SUM(CASE WHEN categories.type = 'saving' THEN transactions.amount ELSE 0 END) as saving")
-                ->where('transactions.user_id', $userId)
-                ->whereRaw("DATE_TRUNC('month', transactions.date) = DATE_TRUNC('month', CURRENT_DATE)")
-                ->first();
+        // ===========================
+        // Summary bulan ini
+        // ===========================
+        public function summaryCurrent()
+        {
+            $userId = auth()->id();
+            if (!$userId) return response()->json(['error' => 'Unauthorized'], 401);
 
-            return response()->json($result);
-        } catch (\Exception $e) {
-            Log::error('Current summary fetch failed', ['error' => $e->getMessage()]);
-            return response()->json(['message' => 'Failed to fetch current summary'], 500);
-        }
-    }
+            try {
+                $result = DB::table('transactions')
+                    ->leftJoin('categories', 'transactions.category_id', '=', 'categories.id')
+                    ->selectRaw("COALESCE(SUM(CASE WHEN categories.type = 'income' THEN transactions.amount ELSE 0 END), 0) as income")
+                    ->selectRaw("COALESCE(SUM(CASE WHEN categories.type = 'income' THEN transactions.amount ELSE 0 END), 0) as income")
+                    ->selectRaw("COALESCE(SUM(CASE WHEN categories.type IN ('expense', 'saving') THEN transactions.amount ELSE 0 END), 0) as expense")
 
-    // ===========================
-    // Insight pertumbuhan & top category
-    // ===========================
-    public function insight()
-    {
-        $userId = auth()->id();
-        if (!$userId) return response()->json(['error' => 'Unauthorized'], 401);
+                    ->where('transactions.user_id', $userId)
+                    ->whereRaw("DATE_TRUNC('month', transactions.date) = DATE_TRUNC('month', CURRENT_DATE)")
+                    ->first();
 
-        try {
-            $currentMonth = DB::table('transactions')
-                ->where('user_id', $userId)
-                ->whereMonth('date', now()->month)
-                ->whereYear('date', now()->year)
-                ->selectRaw("SUM(amount) as total")
-                ->first();
-
-            $lastMonth = DB::table('transactions')
-                ->where('user_id', $userId)
-                ->whereMonth('date', now()->subMonth()->month)
-                ->whereYear('date', now()->subMonth()->year)
-                ->selectRaw("SUM(amount) as total")
-                ->first();
-
-            $growth = 0;
-            if ($lastMonth->total > 0) {
-                $growth = round((($currentMonth->total - $lastMonth->total) / $lastMonth->total) * 100);
+                return response()->json($result);
+            } catch (\Exception $e) {
+                Log::error('Current summary fetch failed', ['error' => $e->getMessage()]);
+                return response()->json(['message' => 'Failed to fetch current summary'], 500);
             }
-
-            $topCategory = DB::table('transactions')
-                ->join('categories', 'transactions.category_id', '=', 'categories.id')
-                ->where('transactions.user_id', $userId)
-                ->whereMonth('transactions.date', now()->month)
-                ->whereYear('transactions.date', now()->year)
-                ->selectRaw('categories.name, SUM(transactions.amount) as total')
-                ->groupBy('categories.name')
-                ->orderByDesc('total')
-                ->first();
-
-            return response()->json([
-                'growth' => $growth,
-                'top_category' => $topCategory->name ?? null,
-            ]);
-        } catch (\Exception $e) {
-            Log::error('Insight fetch failed', ['error' => $e->getMessage()]);
-            return response()->json(['message' => 'Failed to fetch insights'], 500);
         }
-    }
+
+        // ===========================
+        // Insight pertumbuhan & top category
+        // ===========================
+        public function insight()
+        {
+            $userId = auth()->id();
+            if (!$userId) return response()->json(['error' => 'Unauthorized'], 401);
+
+            try {
+                // Total EXPENSE bulan ini
+                $currentMonth = DB::table('transactions')
+                    ->join('categories', 'transactions.category_id', '=', 'categories.id')
+                    ->where('transactions.user_id', $userId)
+                    ->where('categories.type', 'expense')
+                    ->whereMonth('transactions.date', now()->month)
+                    ->whereYear('transactions.date', now()->year)
+                    ->selectRaw("COALESCE(SUM(transactions.amount), 0) as total")
+                    ->first();
+
+                // Total EXPENSE bulan lalu
+                $lastMonth = DB::table('transactions')
+                    ->join('categories', 'transactions.category_id', '=', 'categories.id')
+                    ->where('transactions.user_id', $userId)
+                    ->where('categories.type', 'expense')
+                    ->whereMonth('transactions.date', now()->subMonth()->month)
+                    ->whereYear('transactions.date', now()->subMonth()->year)
+                    ->selectRaw("COALESCE(SUM(transactions.amount), 0) as total")
+                    ->first();
+
+                $growth = 0;
+
+                if ($lastMonth && $lastMonth->total > 0) {
+                    $growth = round((($currentMonth->total - $lastMonth->total) / $lastMonth->total) * 100);
+                } elseif ($currentMonth->total > 0 && (!$lastMonth || $lastMonth->total == 0)) {
+                    $growth = 100;
+                }
+
+                // Top category bulan ini dengan amount
+                $topCategoryThisMonth = DB::table('transactions')
+                    ->join('categories', 'transactions.category_id', '=', 'categories.id')
+                    ->where('transactions.user_id', $userId)
+                    ->where('categories.type', 'expense')
+                    ->whereMonth('transactions.date', now()->month)
+                    ->whereYear('transactions.date', now()->year)
+                    ->selectRaw('categories.name, SUM(transactions.amount) as total')
+                    ->groupBy('categories.name')
+                    ->orderByDesc('total')
+                    ->first();
+
+                // Top category bulan lalu dengan amount
+                $topCategoryLastMonth = DB::table('transactions')
+                    ->join('categories', 'transactions.category_id', '=', 'categories.id')
+                    ->where('transactions.user_id', $userId)
+                    ->where('categories.type', 'expense')
+                    ->whereMonth('transactions.date', now()->subMonth()->month)
+                    ->whereYear('transactions.date', now()->subMonth()->year)
+                    ->selectRaw('categories.name, SUM(transactions.amount) as total')
+                    ->groupBy('categories.name')
+                    ->orderByDesc('total')
+                    ->first();
+
+                return response()->json([
+                    'growth' => $growth,
+                    'current_total' => $currentMonth->total ?? 0,
+                    'last_total' => $lastMonth->total ?? 0,
+                    'top_category_this_month' => [
+                        'name' => $topCategoryThisMonth?->name,
+                        'amount' => $topCategoryThisMonth?->total ?? 0,
+                    ],
+                    'top_category_last_month' => [
+                        'name' => $topCategoryLastMonth?->name,
+                        'amount' => $topCategoryLastMonth?->total ?? 0,
+                    ],
+                ]);
+            } catch (\Exception $e) {
+                Log::error('Insight fetch failed', ['error' => $e->getMessage()]);
+                return response()->json(['message' => 'Failed to fetch insights'], 500);
+            }
+        }
 }

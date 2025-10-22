@@ -1,16 +1,14 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import api from "../api/axios"; // import axios instance dengan BASE_URL
+import api from "../api/axios"; 
+import { useNavigate } from 'react-router-dom';
 
-// Create Auth Context
 const AuthContext = createContext();
 
-// AuthProvider Component
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(localStorage.getItem('token'));
   const [loading, setLoading] = useState(true);
 
-  // Set token di axios headers & fetch user
   useEffect(() => {
     if (token) {
       api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
@@ -20,14 +18,13 @@ export function AuthProvider({ children }) {
     }
   }, [token]);
 
-  // Fetch current user
   const fetchMe = async () => {
     try {
       const res = await api.get("/me");
-      setUser(res.data); // sesuaikan dengan backend yang return user object langsung
+      setUser(res.data); 
     } catch (err) {
       if (err.response?.status === 401) {
-        logout(); // hanya logout kalau unauthorized
+        logout(); 
       }
       console.log(err);
     } finally {
@@ -35,20 +32,19 @@ export function AuthProvider({ children }) {
     }
   };
 
- // Login
 const login = async (email, password) => {
   try {
-    // Hapus token lama dulu sebelum login
     delete api.defaults.headers.common['Authorization'];
     
     const res = await api.post("/login", { email, password });
-    const newToken = res.data.token;
+    const newToken = res.data.access_token;
     setToken(newToken);
     localStorage.setItem("token", newToken);
     api.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
     setUser(res.data.user);
     return { success: true };
   } catch (err) {
+    console.error('Login error:', err)
     return {
       success: false,
       message: err.response?.data?.error || err.response?.data?.message || "Login failed",
@@ -65,7 +61,7 @@ const login = async (email, password) => {
         password,
         password_confirmation,
       });
-      const newToken = res.data.token;
+      const newToken = res.data.access_token;
       setToken(newToken);
       localStorage.setItem("token", newToken);
       api.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;

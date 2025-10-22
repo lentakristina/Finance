@@ -7,7 +7,6 @@ return [
 
     'allowed_origins' => [
     'http://localhost:3000',
-    'https://finance-ashen-psi.vercel.app', // tambahkan ini
 ],
 
     'allowed_origins_patterns' => [],
@@ -18,5 +17,5 @@ return [
 
     'max_age' => 0,
 
-    'supports_credentials' => false,
+    'supports_credentials' => true,
 ];

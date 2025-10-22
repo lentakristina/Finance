@@ -12,13 +12,12 @@ class Transaction extends Model
     protected $fillable = [
         'user_id',
         'category_id',
-        'goal_id',   // pastikan ada ini
+        'goal_id',   
         'amount',
         'date',
         'note',
     ];
 
-    // Relations
     public function user()
     {
         return $this->belongsTo(User::class);
@@ -29,13 +28,11 @@ class Transaction extends Model
         return $this->belongsTo(Category::class);
     }
 
-    // Ini yang hilang / salah
     public function goal()
     {
         return $this->belongsTo(Goal::class);
     }
 
-    // Optional: format Rupiah
     protected $appends = ['amount_rupiah'];
     public function getAmountRupiahAttribute()
     {

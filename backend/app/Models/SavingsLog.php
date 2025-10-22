@@ -12,21 +12,9 @@ class SavingsLog extends Model
     protected $fillable = [
         'transaction_id',
         'goal_id',
-        'user_id',
+        //'user_id',
         'amount'
     ];
-
-    // In your SavingsLog model
-    protected static function boot()
-    {
-        parent::boot();
-        
-        static::creating(function ($savingsLog) {
-            if (!$savingsLog->user_id) {
-                $savingsLog->user_id = auth()->id();
-            }
-        });
-    }
     
     // Relasi ke Goal
     public function goal()

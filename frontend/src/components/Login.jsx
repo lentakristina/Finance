@@ -1,10 +1,11 @@
 import React, { useState } from "react";
 import { Container, Card, Form, Button, Alert, Spinner } from "react-bootstrap";
-import { Link, Navigate } from "react-router-dom";
+import { Link, Navigate , useNavigate  } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 const Login = () => {
   const { login, isAuthenticated } = useAuth();
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -21,7 +22,9 @@ const Login = () => {
 
     const result = await login(formData.email, formData.password);
 
-    if (!result.success) {
+     if (result.success) {
+      navigate('/', { replace: true });
+    } else {
       setError(result.message);
     }
 

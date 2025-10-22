@@ -5,16 +5,29 @@ namespace Database\Seeders;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
+use App\Models\User;
 
 class TransactionSeeder extends Seeder
 {
     public function run(): void
     {
+        // Ambil user pertama yang ada, atau buat user baru
+        $user = User::first();
+        
+        if (!$user) {
+            $user = User::create([
+                'name' => 'Demo User',
+                'email' => 'demo@example.com',
+                'password' => bcrypt('password'),
+            ]);
+        }
+
         $transactions = [];
 
         for ($i = 1; $i <= 20; $i++) {
             $transactions[] = [
-                'category_id' => rand(1, 5), // id categories 1–5
+                'user_id' => $user->id,  // ← TAMBAHKAN INI
+                'category_id' => rand(1, 9),
                 'amount' => rand(50000, 5000000),
                 'date' => Carbon::now()->subDays(rand(0, 30))->format('Y-m-d'),
                 'note' => 'Dummy transaksi #' . $i,
